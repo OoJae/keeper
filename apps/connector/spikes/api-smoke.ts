@@ -165,14 +165,30 @@ async function main(): Promise<void> {
           r.pass(`transport "${transport.kind}" healthy (${health.class}) — ${health.detail}`);
           return;
         }
+        // Step 1 has ALREADY proved the platform answers 2xx with this key. An auth failure
+        // here is therefore ours (the adapter is sending the wrong header), never the
+        // platform's — and calling it INFRA would print "NO-GO on MessagingApiTransport"
+        // over a one-line .env fix that this spike has just discovered for the operator.
+        if (health.class === 'AUTH') {
+          const honored = String(ctx.workingHeader);
+          const configured = env.authHeaderPreference;
+          const wanted = honored.toLowerCase();
+          failSpike(
+            'AUTH_HEADER_MISMATCH',
+            'PRECONDITION',
+            `the platform is UP: step 1 got 2xx from ${baseUrl}${CONVERSATIONS_PATH} using ` +
+              `${honored}. The adapter then got ${health.class} because MINDS_AUTH_HEADER is ` +
+              `"${configured}". This is our .env, not the platform. FIX: set ` +
+              `MINDS_AUTH_HEADER=${wanted} (or =auto) in ${'.env'} and re-run this spike. ` +
+              `Adapter detail: ${health.detail}`,
+          );
+        }
         const code =
-          health.class === 'AUTH'
-            ? 'AUTH_REJECTED'
-            : health.class === 'NOT_FOUND'
-              ? 'ENDPOINT_NOT_FOUND'
-              : health.class === 'UNREACHABLE'
-                ? 'ENDPOINT_UNREACHABLE'
-                : 'SHAPE_DRIFT';
+          health.class === 'NOT_FOUND'
+            ? 'ENDPOINT_NOT_FOUND'
+            : health.class === 'UNREACHABLE'
+              ? 'ENDPOINT_UNREACHABLE'
+              : 'SHAPE_DRIFT';
         failSpike(
           code,
           'INFRA',
@@ -393,7 +409,11 @@ function buildNotes(nonce: string): string {
     '**Transport decision:** ' +
       (failure === null
         ? '**GO** on `MessagingApiTransport`.'
-        : failure.cls === 'INFRA'
+        : failure.code === 'AUTH_REJECTED'
+          ? '**NO-GO PENDING** — every auth header was refused. A wrong/expired key and a platform ' +
+            'that changed its auth are indistinguishable from here, and the first is far likelier. ' +
+            'Re-mint the Builder key and re-run BEFORE recording a transport NO-GO.'
+          : failure.cls === 'INFRA'
           ? `**NO-GO** on \`MessagingApiTransport\` (INFRA \`${failure.code}\`) — activate the Telegram-relay plan (BUILD_PLAN §5 Phase 0 gate).`
           : failure.cls === 'MIND'
             ? `Transport is **GO** (every HTTP call succeeded); the agent misbehaved (\`${failure.code}\`). This does not block the transport decision.`
@@ -408,10 +428,16 @@ function epilogue(): void {
   r.plain('──────────────────────────── DECISION RULE ────────────────────────────');
   r.plain('');
   r.plain('  ANY INFRA-class failure (ENDPOINT_UNREACHABLE, ENDPOINT_NOT_FOUND,');
-  r.plain('  AUTH_REJECTED, SHAPE_DRIFT, RATE_LIMITED)');
+  r.plain('  SHAPE_DRIFT, RATE_LIMITED)');
   r.plain('     => NO-GO on MessagingApiTransport.');
   r.plain('     => Activate the Telegram-relay plan (BUILD_PLAN §5 Phase 0 gate):');
   r.plain('        human-relay mode first, then automate the relay.');
+  r.plain('');
+  r.plain('  AUTH_REJECTED is the ONE INFRA code that is not yet a NO-GO. A wrong or');
+  r.plain('  expired key looks identical to a platform that changed its auth, and the');
+  r.plain('  first is far likelier. Mint a fresh key at build.hellominds.ai/console,');
+  r.plain('  paste it into .env (no quotes, no trailing space), re-run. Only if a');
+  r.plain('  known-good key is still rejected is this a transport NO-GO.');
   r.plain('');
   r.plain('  MIND-class failures (MIND_SILENT, MIND_WRONG, …)');
   r.plain('     => a feature/scope question about the agent.');
@@ -419,6 +445,10 @@ function epilogue(): void {
   r.plain('');
   if (failure === null) {
     r.plain('  THIS RUN: no failures. GO on MessagingApiTransport.');
+  } else if (failure.code === 'AUTH_REJECTED') {
+    r.plain('  THIS RUN: AUTH_REJECTED — every auth header was refused. Do NOT record a');
+    r.plain('            NO-GO yet: re-mint the Builder key and re-run first. If a fresh');
+    r.plain('            key is refused too, THEN it is a transport NO-GO.');
   } else if (failure.cls === 'INFRA') {
     r.plain(`  THIS RUN: INFRA failure (${failure.code}) => NO-GO on MessagingApiTransport.`);
   } else if (failure.cls === 'MIND') {

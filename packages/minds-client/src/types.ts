@@ -31,6 +31,13 @@ export interface SendReceipt {
   /** Opaque resume point captured immediately BEFORE the send. */
   readonly cursor: string | null;
   readonly sentAt: Date;
+  /**
+   * High-water mark on the SERVER's clock: the newest `createdAt` seen in history
+   * immediately before the send, or null when history was empty / untimestamped.
+   * Pass it to {@link AwaitOpts.notBefore} so that a wrong cursor cannot promote an
+   * old message into a "reply" — the cursor is an optimisation, this is the guard.
+   */
+  readonly notBefore: Date | null;
   readonly raw: unknown;
 }
 
@@ -43,6 +50,16 @@ export interface AwaitOpts {
   readonly pollIntervalMs?: number;
   /** Defensive: ignore a record whose text is exactly this (an echo of our own send). */
   readonly skipEchoOfText?: string;
+  /**
+   * Reject any record whose `createdAt` is strictly older than this instant. Records
+   * with no `createdAt` are NOT rejected (we cannot judge them, and rejecting them
+   * would mean never seeing a reply on a server that omits timestamps).
+   *
+   * This is the ordering-independent safety net under the cursor: history paging order
+   * is unverified (see transports/messaging-api.ts), so a cursor may be too permissive.
+   * A timestamp floor taken from the server's own clock cannot be.
+   */
+  readonly notBefore?: Date | null;
 }
 
 export interface MindMessage {

@@ -43,6 +43,10 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [ ] Envelope builder (computes `first_seen`/`last_seen` from the mirror DB)
 - [ ] Pre-filter (joins, heuristics, 1-in-N ambient sampling, creator commands, schedules)
 - [ ] Directive parser wired in with `none` fallback on parse failure
+- [ ] Honour `unfenced_directive`: a directive recovered from bare prose (not a fenced
+      block) may be the Mind *quoting a member*, not ordering us. Require a fence for
+      destructive actions (`delete`/`mute`/`warn`/`reward`) — otherwise a member can type
+      JSON and have it executed. Treat as flag_creator instead.
 - [ ] Executors: reply, delete, warn, flag_creator (DM creator)
 - [ ] SQLite mirror: members, events, actions tables
 - [ ] **Accept:** group message → context-aware reply end-to-end < ~15s; log shows reasoning

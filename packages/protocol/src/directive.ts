@@ -63,21 +63,33 @@ function scanBalancedSpans(text: string, limit: number): string[] {
   return spans;
 }
 
+interface Candidate {
+  json: string;
+  /**
+   * True when the block was recovered from bare prose rather than a fence or a
+   * whole-reply payload. Spec §3.2 says the Mind replies with a *fenced* block, so an
+   * unfenced match may be the Mind quoting a member's message rather than issuing an
+   * order. We still parse it (Minds drop fences often enough that refusing would lose
+   * real directives), but the caller is told, and destructive actions should demand a fence.
+   */
+  unfenced: boolean;
+}
+
 /** Candidates in priority order, deduped, first valid one wins. */
-function collectCandidates(text: string, bounded: string): string[] {
-  const out: string[] = [];
+function collectCandidates(text: string, bounded: string): Candidate[] {
+  const out: Candidate[] = [];
   const seen = new Set<string>();
 
-  const push = (raw: string): void => {
+  const push = (raw: string, unfenced: boolean): void => {
     const c = raw.trim();
     if (c.length === 0 || seen.has(c)) return;
     seen.add(c);
-    out.push(c);
+    out.push({ json: c, unfenced });
   };
 
   // 1. Fast path: the whole reply is the JSON block.
   const trimmed = text.trim();
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) push(trimmed);
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) push(trimmed, false);
 
   // 2/3. Fenced blocks: ```json first, then any other fence.
   const jsonFences: string[] = [];
@@ -89,14 +101,14 @@ function collectCandidates(text: string, bounded: string): string[] {
     if (info.startsWith('json')) jsonFences.push(body);
     else otherFences.push(body);
   }
-  for (const body of jsonFences) push(body);
+  for (const body of jsonFences) push(body, false);
   for (const body of otherFences) {
-    if (body.trim().startsWith('{')) push(body);
-    else for (const span of scanBalancedSpans(body, MAX_CANDIDATES)) push(span);
+    if (body.trim().startsWith('{')) push(body, false);
+    else for (const span of scanBalancedSpans(body, MAX_CANDIDATES)) push(span, false);
   }
 
-  // 4. Balanced-brace scan of the whole (bounded) reply.
-  for (const span of scanBalancedSpans(bounded, MAX_CANDIDATES)) push(span);
+  // 4. Balanced-brace scan of the whole (bounded) reply: bare prose, no fence.
+  for (const span of scanBalancedSpans(bounded, MAX_CANDIDATES)) push(span, true);
 
   return out.slice(0, MAX_CANDIDATES);
 }
@@ -155,11 +167,21 @@ function fallback(reason: FallbackReason, detail: string, rawSnippet?: string): 
  * Iron rule: low confidence never auto-acts. A low-confidence acting directive
  * becomes a creator flag carrying the Mind's original reasoning. A directive
  * with no confidence at all defaults to 'low' and is therefore gated too.
+ *
+ * The check is an allowlist, not `!== 'low'`: this function is exported and may
+ * be handed a directive that never went through `DirectiveSchema` (rehydrated
+ * from the mirror DB, built by an override UI, decoded from a log line). Anything
+ * that is not explicitly 'high' or 'medium' is treated as low and gated, so an
+ * `undefined`/`null`/`'LOW'`/`'unknown'` confidence can never auto-act.
  */
 export function gateDirective(d: KeeperDirective): { directive: KeeperDirective; gated: boolean } {
-  if (d.confidence !== 'low' || !ACTING_ACTIONS.has(d.action)) return { directive: d, gated: false };
+  const trusted = d.confidence === 'high' || d.confidence === 'medium';
+  if (trusted || !ACTING_ACTIONS.has(d.action)) return { directive: d, gated: false };
 
-  const target = 'target_member' in d ? d.target_member : undefined;
+  // An empty/non-string target would make the flag itself fail DirectiveSchema,
+  // so drop it rather than emit a directive the connector cannot execute.
+  const raw = 'target_member' in d ? d.target_member : undefined;
+  const target = typeof raw === 'string' && raw.length > 0 ? raw : undefined;
   const suffix = d.message ? `: ${d.message}` : '';
   const flagged: KeeperDirective = {
     action: 'flag_creator',
@@ -179,28 +201,30 @@ export function extractDirective(replyText: string): DirectiveParseResult {
   const candidates = collectCandidates(text, bounded);
   if (candidates.length === 0) return fallback('no_json_found', text);
 
-  const valid: Array<{ directive: KeeperDirective; raw: string }> = [];
+  const valid: Array<{ directive: KeeperDirective; raw: string; unfenced: boolean }> = [];
   let firstSchemaError: { detail: string; raw: string } | undefined;
   let firstJsonError: { detail: string; raw: string } | undefined;
 
   for (const candidate of candidates) {
-    const parsed = tolerantParse(candidate);
+    const parsed = tolerantParse(candidate.json);
     if (!parsed.ok) {
-      firstJsonError ??= { detail: parsed.error, raw: candidate };
+      firstJsonError ??= { detail: parsed.error, raw: candidate.json };
       continue;
     }
     const result = DirectiveSchema.safeParse(normalizeShape(parsed.value));
     if (!result.success) {
-      firstSchemaError ??= { detail: formatZodError(result.error), raw: candidate };
+      firstSchemaError ??= { detail: formatZodError(result.error), raw: candidate.json };
       continue;
     }
-    valid.push({ directive: result.data, raw: candidate });
+    valid.push({ directive: result.data, raw: candidate.json, unfenced: candidate.unfenced });
   }
 
   const first = valid[0];
   if (first !== undefined) {
     const warnings: string[] = [];
     if (valid.length > 1) warnings.push(`multiple_directive_blocks:${valid.length}`);
+    // Recovered from bare prose: may be the Mind quoting a member, not ordering us.
+    if (first.unfenced) warnings.push('unfenced_directive');
     const { directive, gated } = gateDirective(first.directive);
     return { kind: 'ok', directive, gated, rawBlock: first.raw, warnings };
   }

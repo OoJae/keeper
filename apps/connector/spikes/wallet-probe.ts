@@ -27,12 +27,13 @@ import {
   healthGate,
   pollHistoryFor,
   runSteps,
-  type MindTransport,
   type Step,
 } from './_shared/steps.js';
 
 const r: SpikeReporter = reporter('wallet-probe');
-const TX_HASH = /0x[0-9a-fA-F]{64}/;
+/** Every tx hash in a message. Global so a reply quoting several can be diffed against
+ *  the ones the Mind had already mentioned before we asked for anything. */
+const TX_HASH_ALL = /0x[0-9a-fA-F]{64}/g;
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const APPROVAL = /\b(approv|confirm|authori[sz]|sign it|signature|permission|human)\b/i;
 const ACTION_TIMEOUT_MS = 10 * 60 * 1000;
@@ -48,6 +49,8 @@ interface Ctx {
   approvalStep: string | null;
   txHash: string | null;
   f0: string | null;
+  /** Hashes the Mind mentioned before we requested anything — never proof of THIS run. */
+  priorHashes: Set<string>;
 }
 
 const ctx: Ctx = {
@@ -60,6 +63,7 @@ const ctx: Ctx = {
   approvalStep: null,
   txHash: null,
   f0: null,
+  priorHashes: new Set<string>(),
 };
 
 async function main(): Promise<void> {
@@ -179,6 +183,18 @@ async function main(): Promise<void> {
           r.warn('no answer to the capability question — continuing to the action test anyway.');
           return;
         }
+        // A Mind describing its wallet often cites PAST transactions. Those hashes are in
+        // the conversation before we ask for anything, and grading one of them as "the
+        // transfer happened" would report a refusal as a success. Remember and exclude them.
+        for (const hash of ctx.capabilityAnswer.match(TX_HASH_ALL) ?? []) {
+          ctx.priorHashes.add(hash.toLowerCase());
+        }
+        if (ctx.priorHashes.size > 0) {
+          r.info(
+            `noted ${ctx.priorHashes.size} transaction hash(es) the Mind mentioned BEFORE we ` +
+              'asked for anything; they cannot count as evidence of this run.',
+          );
+        }
         r.plain('');
         r.plain('  The Mind says (verbatim):');
         r.plain(`  ${ctx.capabilityAnswer.replace(/\n/g, '\n  ')}`);
@@ -209,13 +225,26 @@ async function main(): Promise<void> {
 
         const deadline = Date.now() + ACTION_TIMEOUT_MS;
         r.info(`listening up to ${ACTION_TIMEOUT_MS / 60_000} minutes for a transaction hash…`);
+        // Anchor the poll to THIS request, not to ctx.f0 (which predates the capability
+        // question). Polling from f0 re-reads the capability answer, so a hash quoted there
+        // would be graded as the result of a transfer that may never have happened.
+        if (sent.cursor === null) {
+          r.warn(
+            'the send response carried no history cursor, so this poll cannot be anchored to ' +
+              'the transfer request. Any hash below may predate it — check the timestamps.',
+          );
+        }
         const outcome = await pollHistoryFor(r, transport, {
           alias,
-          cursor: ctx.f0,
+          cursor: sent.cursor ?? ctx.f0,
           deadline,
           pollMs: POLL_MS,
           label: 'wallet-action',
-          match: (message) => message.sender === 'mind' && TX_HASH.test(message.text ?? ''),
+          match: (message) => {
+            if (message.sender !== 'mind') return false;
+            const found = (message.text ?? '').match(TX_HASH_ALL) ?? [];
+            return found.some((hash) => !ctx.priorHashes.has(hash.toLowerCase()));
+          },
           onOther: (message) => {
             if (message.sender !== 'mind') return;
             const text = (message.text ?? '').trim();
@@ -245,9 +274,15 @@ async function main(): Promise<void> {
               'request, so a refusal is POLICY, not missing capability. Every HTTP call succeeded.',
           );
         }
-        const hash = TX_HASH.exec(outcome.matched.text ?? '')?.[0] ?? null;
+        const hash =
+          (outcome.matched.text ?? '')
+            .match(TX_HASH_ALL)
+            ?.find((candidate) => !ctx.priorHashes.has(candidate.toLowerCase())) ?? null;
         ctx.txHash = hash;
-        r.pass(`transaction hash returned: ${hash ?? '(regex matched but extraction failed)'}`);
+        r.pass(
+          `transaction hash CLAIMED by the Mind: ${hash ?? '(regex matched but extraction failed)'}. ` +
+            'This spike cannot read the chain — the hash is the Mind\'s assertion, not a verified fact.',
+        );
       },
     },
 
@@ -257,11 +292,18 @@ async function main(): Promise<void> {
         const hash = ctx.txHash;
         const chain = ctx.chain;
         r.plain('');
-        r.plain(`  tx hash : ${hash ?? 'none'}`);
+        r.plain(`  tx hash : ${hash ?? 'none'}   <- CLAIMED by the Mind, NOT verified by us`);
         r.plain(`  chain   : ${chain ?? 'UNREPORTED by the API'}`);
         r.plain(`  explorer: ${explorerLine(chain, hash)}`);
         r.plain('');
-        r.pass('on-chain action completed and recorded');
+        r.plain('  VERIFY BEFORE YOU USE THIS AS EVIDENCE. This spike never reads the chain;');
+        r.plain('  a Mind that invents a plausible-looking hash is indistinguishable from');
+        r.plain('  one that really transacted. Open the explorer link and confirm:');
+        r.plain('    1. the transaction exists at all;');
+        r.plain(`    2. its from AND to are ${ctx.walletAddress ?? 'the Mind\'s own address'};`);
+        r.plain('    3. its timestamp is inside this run, not some earlier one.');
+        r.plain('');
+        r.pass('transaction hash recorded (claimed by the Mind; verify on the explorer)');
       },
     },
   ];
@@ -280,7 +322,7 @@ async function main(): Promise<void> {
       alias,
       walletAddress: ctx.walletAddress,
       chain: ctx.chain,
-      txHash: ctx.txHash,
+      txHashClaimedUnverified: ctx.txHash,
     },
   });
   r.info(`appended to ${path}`);
@@ -307,9 +349,11 @@ function epilogue(): void {
   r.plain('──────────────────────── WALLET: WHAT THIS MEANS ────────────────────────');
   r.plain('');
   if (ctx.txHash !== null) {
-    r.plain('  A Mind executed a real on-chain action on request. Phase 5 has a credible');
-    r.plain('  "smallest on-chain artifact". Keep the self-transfer pattern for the demo');
-    r.plain('  unless a reward transfer to a member address is separately proven safe.');
+    r.plain('  A Mind CLAIMED an on-chain action on request and produced a hash. Once you');
+    r.plain('  have confirmed it on the explorer, Phase 5 has a credible "smallest on-chain');
+    r.plain('  artifact". Until then it is an unverified claim — do not put it on camera.');
+    r.plain('  Keep the self-transfer pattern for the demo unless a reward transfer to a');
+    r.plain('  member address is separately proven safe.');
   } else if (ctx.walletAddress === null) {
     r.plain('  No wallet on this Mind. Enable it in the platform UI and re-run; if only the');
     r.plain('  Rewards Mind has one, point MINDS_MIND_ID at that Mind for this spike.');
@@ -345,8 +389,13 @@ function buildNotes(): string {
   }
   if (ctx.txHash !== null) {
     parts.push(
-      `**On-chain action: SUCCEEDED.** Minimum-value self-transfer to the Mind\'s own address.\n\n` +
-        `- tx: \`${ctx.txHash}\`\n- explorer: ${explorerLine(ctx.chain, ctx.txHash)}`,
+      '**On-chain action: hash CLAIMED by the Mind — NOT independently verified.** The request ' +
+        "was a minimum-value self-transfer to the Mind's own address. This spike has no chain " +
+        'access, so what is verified is that the Mind ANSWERED with a well-formed hash, not that ' +
+        'a transaction exists. Confirm on the explorer (exists / from+to = ' +
+        `\`${ctx.walletAddress ?? 'the Mind\'s own address'}\` / timestamped inside this run) ` +
+        'before citing it as an on-chain artifact.\n\n' +
+        `- tx (claimed): \`${ctx.txHash}\`\n- explorer: ${explorerLine(ctx.chain, ctx.txHash)}`,
     );
   } else {
     const verbatim = ctx.transferReplies.at(-1) ?? null;

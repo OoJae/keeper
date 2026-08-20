@@ -129,6 +129,9 @@ export interface SpikeEnv {
 
 const NON_EMPTY = z.string().trim().min(1);
 
+/** The only three values @keeper/minds-client's config schema accepts, lowercase. */
+const AUTH_HEADER_VALUES = ['x-api-key', 'x-access-key', 'auto'] as const;
+
 /**
  * Loads .env from the repo root and validates the vars this spike needs.
  * On failure it prints the exact fix for every missing var and exits 2.
@@ -167,6 +170,30 @@ export function loadSpikeEnv(required: string[], r?: SpikeReporter): SpikeEnv {
   registerSecret(process.env['MINDS_BUILDER_API_KEY']);
   registerSecret(process.env['MINDS_ACCESS_KEY']);
 
+  // The adapter reads MINDS_AUTH_HEADER straight out of process.env and rejects anything
+  // that is not one of three LOWERCASE literals — including "X-Api-Key", which is exactly
+  // how the header is spelled in .env.example's comments and in docs/API-NOTES.md. Left
+  // alone, that typo surfaces as a MindsConfigError thrown from createMindClient(), which
+  // the spikes print under a "HARNESS BUG — fix the harness" banner. It is not a harness
+  // bug and it is not a platform verdict: it is one line of .env. Normalise it here, and
+  // reject an unusable value with the exact fix instead of a stack trace.
+  const rawAuthHeader = (process.env['MINDS_AUTH_HEADER'] ?? '').trim();
+  const authHeaderPreference = rawAuthHeader === '' ? 'x-api-key' : rawAuthHeader.toLowerCase();
+  if (!(AUTH_HEADER_VALUES as readonly string[]).includes(authHeaderPreference)) {
+    printBadAuthHeader(rawAuthHeader);
+    if (r) {
+      r.fail(
+        'BAD_ENV',
+        'PRECONDITION',
+        `MINDS_AUTH_HEADER="${rawAuthHeader}" is not one of ${AUTH_HEADER_VALUES.join(' | ')}.`,
+      );
+      r.finishAndExit();
+    }
+    process.exit(2);
+  }
+  // Hand the adapter the normalised value so its own schema agrees with ours.
+  process.env['MINDS_AUTH_HEADER'] = authHeaderPreference;
+
   const values = parsed.data;
   return {
     get(name: string): string {
@@ -183,8 +210,31 @@ export function loadSpikeEnv(required: string[], r?: SpikeReporter): SpikeEnv {
       return value === undefined || value.trim() === '' ? undefined : value.trim();
     },
     baseUrl: (process.env['MINDS_API_BASE_URL'] ?? '').trim() || 'https://api.build.hellominds.ai',
-    authHeaderPreference: ((process.env['MINDS_AUTH_HEADER'] ?? '').trim() || 'x-api-key').toLowerCase(),
+    authHeaderPreference,
   };
+}
+
+function printBadAuthHeader(value: string): void {
+  process.stdout.write(
+    [
+      '',
+      'PRECONDITION FAILURE — MINDS_AUTH_HEADER is not a value we understand.',
+      '',
+      `  you wrote:  MINDS_AUTH_HEADER=${value}`,
+      `  edit ${ENV_PATH} to one of (lowercase, exactly):`,
+      '',
+      '      MINDS_AUTH_HEADER=x-api-key      # canonical; what you want unless a spike says otherwise',
+      '      MINDS_AUTH_HEADER=x-access-key   # deprecated, but some deployments still require it',
+      '      MINDS_AUTH_HEADER=auto           # try x-api-key, fall back to x-access-key on 401/403',
+      '',
+      '  (Case matters here even though HTTP header names are case-insensitive: this is the',
+      '   name of a MODE in our config, not the header itself. "X-Api-Key" is not accepted.)',
+      '',
+      'This is a PRECONDITION failure: our harness/setup, not the platform.',
+      'It says NOTHING about whether the Minds API works. Fix the above and re-run.',
+      '',
+    ].join('\n') + '\n',
+  );
 }
 
 function printEnvFailure(missing: string[], envFileExists: boolean): void {

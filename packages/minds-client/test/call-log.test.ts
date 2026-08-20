@@ -33,7 +33,7 @@ class FakeTransport implements MindTransport {
     return { alias, conversationId: 'c', raw: {} };
   }
   async send(alias: string, text: string): Promise<SendReceipt> {
-    return { alias, sentText: text, cursor: 'fp-0', sentAt: new Date(), raw: {} };
+    return { alias, sentText: text, cursor: 'fp-0', sentAt: new Date(), notBefore: null, raw: {} };
   }
   async awaitReply(_alias: string, _opts: AwaitOpts): Promise<MindMessage> {
     return { id: 'fp-1', text: 'ok', sender: 'mind', at: null, raw: {} };

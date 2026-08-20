@@ -56,6 +56,9 @@ const RETRY_DELAYS_MS = {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
+/** Cap on server-supplied `Retry-After`. Beyond this, failing fast beats stalling. */
+const MAX_RETRY_AFTER_MS = 30_000;
+
 /**
  * Which auth header actually works is remembered for the whole process, not per
  * instance: the answer is a property of the deployed platform, and re-probing it on
@@ -92,6 +95,12 @@ interface HttpRequest {
   json?: unknown;
   /** Return the 404 instead of throwing — used where "absent" is a normal answer. */
   tolerate404?: boolean;
+  /**
+   * Absolute `Date.now()` budget for the CALLER (e.g. awaitReply's deadline). Retries
+   * that would sleep past it are not attempted, so a retry storm can never turn a
+   * `timeoutMs: 5_000` await into a minutes-long stall.
+   */
+  deadline?: number;
 }
 
 export class MessagingApiTransport implements MindTransport, CognitionSampler {
@@ -166,10 +175,14 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
   async send(alias: string, text: string): Promise<SendReceipt> {
     await this.ensureConversation(alias);
 
-    // Capture the newest fingerprint BEFORE posting. Without this there is no way to
-    // tell a fresh reply from history we have already seen.
-    const before = await this.fetchHistory(alias, { limit: 1 });
-    const f0 = newestFingerprint(before);
+    // Snapshot history BEFORE posting. Without this there is no way to tell a fresh
+    // reply from history we have already seen. A FULL page is read, not limit=1: with
+    // limit=1 the single record is whichever END of the conversation the server pages
+    // from, and that ordering is unverified — reading a page lets us pick the newest by
+    // its own `createdAt` instead of by position (see newestOf()).
+    const before = await this.fetchHistory(alias, { limit: DEFAULT_HISTORY_PAGE_SIZE });
+    const highWater = newestOf(before);
+    const f0 = highWater?.fingerprint ?? null;
 
     const sentAt = new Date();
     const posted = await this.request({
@@ -188,7 +201,14 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
       if (entry) entry.lastSeenFingerprint = cursor;
     });
 
-    return { alias, sentText: text, cursor, sentAt, raw: posted.body };
+    return {
+      alias,
+      sentText: text,
+      cursor,
+      sentAt,
+      notBefore: highWater ? recordTime(highWater) : null,
+      raw: posted.body,
+    };
   }
 
   // ------------------------------------------------------------------ awaitReply
@@ -198,19 +218,25 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
     const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     const startedAt = Date.now();
     const deadline = startedAt + timeoutMs;
+    const floor = opts.notBefore ?? null;
     let cursor = opts.cursor;
 
     for (;;) {
-      const records = await this.fetchHistory(alias, {
-        limit: DEFAULT_HISTORY_PAGE_SIZE,
-        ...(cursor !== null ? { after: cursor } : {}),
-      });
+      const records = await this.fetchHistory(
+        alias,
+        { limit: DEFAULT_HISTORY_PAGE_SIZE, ...(cursor !== null ? { after: cursor } : {}) },
+        deadline,
+      );
 
       for (const record of records) {
         const message = toMindMessage(record);
         if (message.sender !== 'mind') continue;
         if (opts.cursor !== null && record.fingerprint === opts.cursor) continue;
         if (opts.skipEchoOfText !== undefined && message.text === opts.skipEchoOfText) continue;
+        // Timestamp floor. The cursor alone cannot be trusted to exclude old traffic
+        // while the paging order is unverified; a server-clock timestamp can.
+        if (floor !== null && message.at !== null && message.at.getTime() < floor.getTime()) continue;
+        this.rememberCursor(alias, record.fingerprint); // so a resume does not re-deliver it
         return message; // first match wins
       }
 
@@ -219,10 +245,7 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
       const last = records.at(-1);
       if (last) {
         cursor = last.fingerprint;
-        this.mutateState((s) => {
-          const entry = s.conversations[alias];
-          if (entry) entry.lastSeenFingerprint = cursor;
-        });
+        this.rememberCursor(alias, cursor);
       }
 
       const remaining = deadline - Date.now();
@@ -244,6 +267,7 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
       ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
       ...(opts.pollIntervalMs !== undefined ? { pollIntervalMs: opts.pollIntervalMs } : {}),
       skipEchoOfText: opts.skipEchoOfText ?? text,
+      notBefore: opts.notBefore !== undefined ? opts.notBefore : sent.notBefore,
     });
     return {
       sent,
@@ -266,11 +290,13 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
   private async fetchHistory(
     alias: string,
     query: { limit?: number; after?: string },
+    deadline?: number,
   ): Promise<MessageRecord[]> {
     const res = await this.request({
       method: 'GET',
       path: `/v1/messaging/histories/${encodeURIComponent(alias)}`,
       query,
+      ...(deadline !== undefined ? { deadline } : {}),
     });
     return parseOrThrow(
       MessageRecordListSchema,
@@ -343,6 +369,13 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
     return this.readState().conversations[alias]?.lastSeenFingerprint ?? null;
   }
 
+  private rememberCursor(alias: string, fingerprint: string | null): void {
+    this.mutateState((s) => {
+      const entry = s.conversations[alias];
+      if (entry) entry.lastSeenFingerprint = fingerprint;
+    });
+  }
+
   private readState(): StateFile {
     if (this.state) return this.state;
     let loaded: StateFile = { version: 1, conversations: {} };
@@ -409,7 +442,7 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
 
       if (!attempt.ok) {
         const delay = RETRY_DELAYS_MS.network[nNetwork];
-        if (delay !== undefined) {
+        if (delay !== undefined && this.affordable(delay, req.deadline)) {
           nNetwork += 1;
           this.opts.onNote(
             `minds-client retry: network error on ${req.method} ${url} — attempt ${nNetwork} in ${delay}ms`,
@@ -462,8 +495,8 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
         continue;
       }
 
-      const retryDelay = this.retryDelayFor(res, { n409, n502, n429 });
-      if (retryDelay !== null) {
+      const retryDelay = this.retryDelayFor(res, body, { n409, n502, n429 });
+      if (retryDelay !== null && this.affordable(retryDelay, req.deadline)) {
         if (res.status === 409) n409 += 1;
         else if (res.status === 502) n502 += 1;
         else n429 += 1;
@@ -485,8 +518,15 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
     }
   }
 
+  /** A retry we cannot afford within the caller's budget is not a retry, it is a stall. */
+  private affordable(delayMs: number, deadline: number | undefined): boolean {
+    if (deadline === undefined) return true;
+    return Date.now() + delayMs < deadline;
+  }
+
   private retryDelayFor(
     res: Response,
+    body: unknown,
     counts: { n409: number; n502: number; n429: number },
   ): number | null {
     if (res.status === 409) return RETRY_DELAYS_MS.conflict409[counts.n409] ?? null;
@@ -494,7 +534,10 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
     if (res.status === 429) {
       const budget = RETRY_DELAYS_MS.rateLimit429[counts.n429];
       if (budget === undefined) return null;
-      return retryAfterMs(res) ?? budget;
+      // Server guidance wins over our fixed budget, but only up to a cap: an
+      // unclamped `Retry-After: 86400` would park a demo for a day.
+      const guided = retryAfterMs(res, body);
+      return guided === null ? budget : Math.min(guided, MAX_RETRY_AFTER_MS);
     }
     return null;
   }
@@ -521,21 +564,57 @@ async function tryFetch(url: string, init: RequestInit): Promise<FetchAttempt> {
 }
 
 /**
- * ASSUMPTION (unverified, spike:api-smoke must confirm): the histories endpoint returns
- * records oldest-first, so with limit=1 the single record is the newest. If the API turns
- * out to page newest-first, this and awaitReply's cursor advance both need to flip.
+ * Newest record in a page, chosen by the SERVER's own `createdAt` rather than by
+ * position — because the paging order is UNVERIFIED (spike:api-smoke must settle it)
+ * and position is the one thing that depends on it. Falls back to the last element
+ * only when no record carries a timestamp.
+ *
+ * Residual risk, deliberately accepted: on an oldest-first server whose history is
+ * longer than one page, page 1 is not the newest page, so this high-water mark is too
+ * low. `AwaitOpts.notBefore` is the guard that keeps that from becoming a false reply
+ * (it is derived from the same timestamps, so a too-low cursor only costs re-reads).
  */
-function newestFingerprint(records: MessageRecord[]): string | null {
-  return records.at(-1)?.fingerprint ?? null;
+function newestOf(records: MessageRecord[]): MessageRecord | null {
+  let best: MessageRecord | null = null;
+  let bestAt = Number.NEGATIVE_INFINITY;
+  for (const record of records) {
+    const at = recordTime(record)?.getTime() ?? Number.NEGATIVE_INFINITY;
+    if (best === null || at >= bestAt) {
+      best = record;
+      bestAt = at;
+    }
+  }
+  return best;
 }
 
-function retryAfterMs(res: Response): number | null {
-  const header = res.headers.get('retry-after') ?? res.headers.get('retry_after');
-  if (!header) return null;
-  const seconds = Number(header);
+function recordTime(record: MessageRecord): Date | null {
+  if (record.createdAt === undefined) return null;
+  const d = new Date(record.createdAt);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Honours `Retry-After` as a header AND as a JSON body field; callers clamp the result. */
+function retryAfterMs(res: Response, body: unknown): number | null {
+  const raw =
+    res.headers.get('retry-after') ??
+    res.headers.get('retry_after') ??
+    retryAfterFromBody(body);
+  if (raw === null || raw === '') return null;
+  const seconds = Number(raw);
   if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
-  const date = Date.parse(header);
+  const date = Date.parse(String(raw));
   return Number.isNaN(date) ? null : Math.max(0, date - Date.now());
+}
+
+function retryAfterFromBody(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  for (const key of ['retry_after', 'retryAfter', 'retryAfterSeconds'] as const) {
+    const value = rec[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+  return null;
 }
 
 function extractRequestId(res: Response, body: unknown): string | undefined {

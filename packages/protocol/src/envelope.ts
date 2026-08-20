@@ -42,18 +42,35 @@ export function daysAgoSuffix(lastSeen: Date, ts: Date, offsetMin: number): stri
   return `(${diff} days ago)`;
 }
 
-/** Header lines are single-line and quote-delimited; keep them that way. */
+/**
+ * Header lines are single-line and quote-delimited; keep them that way.
+ * Backslashes are escaped *before* quotes, otherwise a value ending in `\`
+ * turns the closing delimiter into an escaped quote and the value runs on.
+ */
 function headerValue(raw: string): string {
-  return raw.replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ');
+  return raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ');
 }
 
+/**
+ * Handles render unquoted, so they must stay a single whitespace-free token —
+ * a newline here would forge extra header lines (and a whole second envelope).
+ * Real handles are `[A-Za-z0-9_]`, so this only ever rewrites malformed input.
+ */
 function normalizeHandle(handle: string): string {
-  return handle.startsWith('@') ? handle : `@${handle}`;
+  const token = handle.replace(/\s+/g, '');
+  return token.startsWith('@') ? token : `@${token}`;
 }
 
-/** A member must not be able to forge a second envelope header inside content. */
+/**
+ * A member must not be able to forge a second envelope header inside content.
+ * Matched loosely (case, spacing, any dash) because the reader is an LLM, not a
+ * strict parser: `[keeper-event]` would be honoured just as readily as the
+ * canonical marker, so an exact-string replace is not a real defence.
+ */
+const HEADER_MARKER_RE = /\[\s*keeper[\s\p{Pd}_]*event\s*\]/giu;
+
 function neutralizeContent(content: string): string {
-  return content.split(HEADER_MARKER).join(NEUTRALIZED_MARKER);
+  return content.replace(HEADER_MARKER_RE, NEUTRALIZED_MARKER);
 }
 
 /**

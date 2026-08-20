@@ -138,10 +138,24 @@ export function withCallLog(
     /**
      * healthCheck reports failure instead of throwing, so `ok` must come from the report
      * — otherwise every failed probe would be logged as a success.
+     *
+     * The MindTransport contract says healthCheck NEVER throws, and this decorator is
+     * the MindTransport product code actually holds — so it upholds the contract here
+     * rather than trusting the wrapped transport to. A probe that explodes is exactly
+     * when the caller least wants an exception.
      */
     async healthCheck(): Promise<HealthReport> {
       const startedAt = Date.now();
-      const report = await transport.healthCheck();
+      let report: HealthReport;
+      try {
+        report = await transport.healthCheck();
+      } catch (e) {
+        report = {
+          ok: false,
+          class: 'UNREACHABLE',
+          detail: `healthCheck threw: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      }
       log.append({
         ts: new Date().toISOString(),
         transport: transport.kind,

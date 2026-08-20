@@ -24,13 +24,21 @@ import {
   pollHistoryFor,
   runSteps,
   type MindHistoryMessage,
-  type MindTransport,
   type Step,
 } from './_shared/steps.js';
 
 const r: SpikeReporter = reporter('circle-probe');
 const RELAY_TIMEOUT_MS = 10 * 60 * 1000;
 const POLL_MS = 15_000;
+/**
+ * The phrase we grade for is INSIDE the request we send ("ask it to reply with X"), so a
+ * Steward that merely acknowledges — "sure, I'll ask them for X" — contains the phrase
+ * without any relay having happened. Grading that as a PASS would feed the §12 descope
+ * decision a capability the platform may not have. So: an occurrence that arrives in the
+ * first ECHO_GRACE_MS is treated as an echo of our own words, recorded verbatim as
+ * evidence, and NOT as proof. A real relay rides email/Telegram and takes minutes.
+ */
+const ECHO_GRACE_MS = 60_000;
 
 const REFUSAL = /\b(can'?t|cannot|unable|not able|don'?t have|do not have|no ability|not permitted|no access)\b/i;
 
@@ -46,8 +54,10 @@ interface Ctx {
   steward: Party | null;
   rewards: Party | null;
   f0: string | null;
+  requestedAtMs: number;
   firstReply: string | null;
   refusal: string | null;
+  earlyEcho: { at: string; text: string } | null;
   hit: MindHistoryMessage | null;
   mindMessages: string[];
 }
@@ -56,8 +66,10 @@ const ctx: Ctx = {
   steward: null,
   rewards: null,
   f0: null,
+  requestedAtMs: 0,
   firstReply: null,
   refusal: null,
+  earlyEcho: null,
   hit: null,
   mindMessages: [],
 };
@@ -175,9 +187,12 @@ async function main(): Promise<void> {
         const target = rewards.email === null ? rewards.name : `${rewards.name} (${rewards.email})`;
         const instruction =
           `Contact ${target}. Ask it to reply to you with the exact phrase ${phrase}. ` +
-          `When it does, send me a message containing that exact phrase.`;
+          `When it does, send me a SEPARATE, LATER message containing that exact phrase. ` +
+          `Do NOT include the phrase in your reply to this message — only after ` +
+          `${rewards.name} has actually said it to you.`;
         r.info(`-> ${instruction}`);
         const sent = await transport.send(alias, instruction);
+        ctx.requestedAtMs = sent.sentAt.getTime();
         r.raw('relay-request-send-response', sent.raw);
         r.pass(`relay request accepted at ${sent.sentAt.toISOString()}`);
       },
@@ -193,13 +208,30 @@ async function main(): Promise<void> {
           deadline,
           pollMs: POLL_MS,
           label: 'relay',
-          match: (message) =>
-            message.sender === 'mind' && (message.text ?? '').toUpperCase().includes(phrase),
+          match: (message) => {
+            if (message.sender !== 'mind') return false;
+            if (!(message.text ?? '').toUpperCase().includes(phrase)) return false;
+            // Our own request carries the phrase, so an immediate acknowledgement echoes it
+            // back with no relay behind it. Only an occurrence separated from the request
+            // by ECHO_GRACE_MS counts. Messages without a timestamp are dated by arrival,
+            // which is the correct reading here: we only see them when we poll.
+            const at = message.at instanceof Date ? message.at.getTime() : Date.now();
+            return at >= ctx.requestedAtMs + ECHO_GRACE_MS;
+          },
           onOther: (message) => {
             if (message.sender !== 'mind') return;
             const text = (message.text ?? '').trim();
             if (text === '') return;
             ctx.mindMessages.push(text);
+            if (text.toUpperCase().includes(phrase) && ctx.earlyEcho === null) {
+              const at = message.at instanceof Date ? message.at.toISOString() : 'unknown time';
+              ctx.earlyEcho = { at, text };
+              r.warn(
+                `the phrase came back within ${ECHO_GRACE_MS / 1000}s of our request (${at}) — ` +
+                  'that reads as the Steward echoing our own words, not as a completed relay. ' +
+                  'NOT counted as proof. Still listening for a later, separate message.',
+              );
+            }
             if (ctx.firstReply === null) {
               ctx.firstReply = text;
               r.plain('');
@@ -229,8 +261,14 @@ async function main(): Promise<void> {
           'MIND',
           `the Steward never returned "${phrase}" within ${RELAY_TIMEOUT_MS / 60_000} minutes ` +
             `(${ctx.mindMessages.length} Mind message(s) seen). ` +
+            (ctx.earlyEcho === null
+              ? ''
+              : `It DID echo the phrase back ${Math.round(
+                  (new Date(ctx.earlyEcho.at).getTime() - ctx.requestedAtMs) / 1000,
+                )}s after our request — that is our own wording coming back, not a relay, so it ` +
+                `was not counted. Judge it yourself: "${ctx.earlyEcho.text}". `) +
             (verbatim === null
-              ? 'It said nothing at all.'
+              ? 'It said nothing else at all.'
               : `Its own words, verbatim: "${verbatim}"`) +
             ' Every HTTP call succeeded — this is about agent-to-agent reach, not the transport.',
         );
@@ -303,6 +341,16 @@ function epilogue(): void {
     r.plain('  Steward -> Rewards relay WORKS. Phase 5 (Circles + on-chain reward) stays in scope.');
     r.plain('  Note how long it took: A2A rides email/Telegram, so build the demo beat around');
     r.plain('  that latency (pre-trigger it, or narrate "Keeper considers, then acts").');
+  } else if (ctx.earlyEcho !== null) {
+    r.plain('  The Steward repeated our phrase back almost immediately and then nothing else');
+    r.plain('  arrived. Our request contains that phrase, so the echo proves NOTHING about');
+    r.plain('  whether the Rewards Mind was ever reached — it was deliberately not graded.');
+    r.plain('  Read the verbatim text above. If you believe a relay really did happen that');
+    r.plain(`  fast, re-run and watch the two Minds' own inboxes; otherwise treat this as a`);
+    r.plain('  non-relay and follow the descope guidance below.');
+    r.plain('');
+    r.plain('  Per BUILD_PLAN §12, if this is not demo-stable by Aug 24 EOD, execute');
+    r.plain('  Descope Plan A: single Steward Mind, rewards become recommendations.');
   } else {
     r.plain('  Steward -> Rewards relay did NOT complete. Per BUILD_PLAN §12, if this is not');
     r.plain('  demo-stable by Aug 24 EOD, execute Descope Plan A without sentimentality:');
@@ -336,11 +384,24 @@ function buildNotes(phrase: string): string {
   if (ctx.firstReply !== null) {
     parts.push(`Steward's first reply, verbatim:\n\n${fenced(ctx.firstReply, 'text')}`);
   }
+  if (ctx.earlyEcho !== null) {
+    parts.push(
+      `**Echo, not relay.** The phrase came back at \`${ctx.earlyEcho.at}\`, within ` +
+        `${ECHO_GRACE_MS / 1000}s of our request — the request itself contains the phrase, so ` +
+        'this is the Steward repeating our wording, and it was NOT graded as a completed ' +
+        `relay:\n\n${fenced(ctx.earlyEcho.text, 'text')}`,
+    );
+  }
   if (ctx.refusal !== null && ctx.refusal !== ctx.firstReply) {
     parts.push(`Steward's refusal, verbatim:\n\n${fenced(ctx.refusal, 'text')}`);
   }
   if (ctx.hit !== null) {
-    parts.push(`Relayed phrase received:\n\n${fenced(ctx.hit.text ?? '', 'text')}`);
+    const at = ctx.hit.at instanceof Date ? ctx.hit.at.toISOString() : 'unknown time';
+    parts.push(
+      `Relayed phrase received at \`${at}\`, ` +
+        `${Math.round(((ctx.hit.at instanceof Date ? ctx.hit.at.getTime() : Date.now()) - ctx.requestedAtMs) / 1000)}s ` +
+        `after the request (echo window was ${ECHO_GRACE_MS / 1000}s):\n\n${fenced(ctx.hit.text ?? '', 'text')}`,
+    );
     parts.push('**§12 decision input:** Phase 5 (Circles + on-chain reward) stays in scope.');
   } else {
     parts.push(

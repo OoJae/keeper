@@ -349,6 +349,9 @@ export async function pollHistoryFor(
 ): Promise<PollOutcome> {
   const pollMs = options.pollMs ?? 10_000;
   const seen: MindHistoryMessage[] = [];
+  // Until the first message arrives there is no cursor to advance, so an empty conversation
+  // re-reads the same head of history every poll. Dedupe by id rather than double-counting.
+  const seenIds = new Set<string>();
   let cursor = options.cursor;
   const totalS = Math.max(1, Math.round((options.deadline - Date.now()) / 1000));
   let lastTick = 0;
@@ -366,8 +369,12 @@ export async function pollHistoryFor(
     }
 
     for (const message of batch) {
+      if (typeof message.id === 'string') {
+        if (seenIds.has(message.id)) continue;
+        seenIds.add(message.id);
+        cursor = message.id;
+      }
       seen.push(message);
-      cursor = typeof message.id === 'string' ? message.id : cursor;
       if (options.match(message)) {
         clearTicker();
         r.raw(`${options.label}-match`, message.raw);

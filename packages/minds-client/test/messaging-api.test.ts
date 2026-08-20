@@ -127,10 +127,34 @@ describe('send', () => {
     ];
     const receipt = await transport().send('a', 'hello');
 
-    expect(calls[1]?.url.searchParams.get('limit')).toBe('1');
+    // A whole page, not limit=1: with one record the cursor is whichever END of the
+    // conversation the server pages from, and that ordering is unverified.
+    expect(calls[1]?.url.searchParams.get('limit')).toBe('50');
     expect(receipt.cursor).toBe('fp-old');
     expect(receipt.sentText).toBe('hello');
     expect(receipt.raw).toEqual({ accepted: true });
+  });
+
+  it('picks the pre-send high-water mark by createdAt, not by position', async () => {
+    // An oldest-first server hands back [oldest .. newest]; a newest-first server the
+    // reverse. Both must yield the same cursor and the same notBefore.
+    const chrono = [
+      { fingerprint: 'fp-1', senderType: 1, messageText: 'hi', createdAt: '2026-08-17T10:00:00.000Z' },
+      { fingerprint: 'fp-2', senderType: 0, messageText: 'stale reply', createdAt: '2026-08-17T10:00:05.000Z' },
+      { fingerprint: 'fp-3', senderType: 1, messageText: 'thanks', createdAt: '2026-08-17T10:01:00.000Z' },
+    ];
+    for (const page of [chrono, [...chrono].reverse()]) {
+      calls = [];
+      statePath = join(mkdtempSync(join(tmpdir(), 'keeper-minds-')), 'minds-state.json');
+      replies = [
+        { status: 200, body: { conversationId: 'c' } },
+        { status: 200, body: page },
+        { status: 200, body: { accepted: true } },
+      ];
+      const receipt = await transport().send('a', 'are you there?');
+      expect(receipt.cursor).toBe('fp-3');
+      expect(receipt.notBefore?.toISOString()).toBe('2026-08-17T10:01:00.000Z');
+    }
   });
 
   it('prefers a fingerprint returned by the send response', async () => {
@@ -179,6 +203,62 @@ describe('awaitReply', () => {
     await expect(
       transport().awaitReply('a', { cursor: null, pollIntervalMs: 1, timeoutMs: 0 }),
     ).rejects.toBeInstanceOf(MindReplyTimeoutError);
+  });
+
+  it('never returns a record older than notBefore, even with a bad cursor', async () => {
+    // The catastrophic case: cursor points too far back, so a 3-day-old Mind message is
+    // inside the page. The timestamp floor must reject it rather than call it a reply.
+    replies = [
+      {
+        status: 200,
+        body: [
+          { fingerprint: 'fp-2', senderType: 0, messageText: 'stale', createdAt: '2026-08-17T10:00:05.000Z' },
+          { fingerprint: 'fp-4', senderType: 1, messageText: 'ours', createdAt: '2026-08-20T12:00:00.000Z' },
+        ],
+      },
+      {
+        status: 200,
+        body: [{ fingerprint: 'fp-5', senderType: 0, messageText: 'fresh', createdAt: '2026-08-20T12:00:02.000Z' }],
+      },
+    ];
+    const reply = await transport().awaitReply('a', {
+      cursor: 'fp-1',
+      pollIntervalMs: 1,
+      timeoutMs: 5000,
+      notBefore: new Date('2026-08-20T11:59:00.000Z'),
+    });
+    expect(reply).toMatchObject({ id: 'fp-5', text: 'fresh' });
+  });
+
+  it('does not reject a record that carries no createdAt', async () => {
+    replies = [{ status: 200, body: [{ fingerprint: 'fp-x', senderType: 0, messageText: 'no clock' }] }];
+    const reply = await transport().awaitReply('a', {
+      cursor: null,
+      pollIntervalMs: 1,
+      timeoutMs: 5000,
+      notBefore: new Date('2999-01-01T00:00:00.000Z'),
+    });
+    expect(reply.id).toBe('fp-x');
+  });
+
+  it('persists the fingerprint it returned, so a resume does not re-deliver it', async () => {
+    replies = [
+      { status: 200, body: { conversationId: 'c' } },
+      { status: 200, body: [record('fp-r', 0, 'the answer')] },
+    ];
+    const t = transport();
+    await t.ensureConversation('a');
+    await t.awaitReply('a', { cursor: 'fp-0', pollIntervalMs: 1, timeoutMs: 5000 });
+    expect(t.getCachedCursor('a')).toBe('fp-r');
+  });
+
+  it('does not blow past timeoutMs when the server sends a long Retry-After', async () => {
+    replies = [{ status: 429, body: { message: 'slow' }, headers: { 'retry-after': '30' } }];
+    const started = Date.now();
+    await expect(
+      transport().awaitReply('a', { cursor: 'fp-0', pollIntervalMs: 1, timeoutMs: 50 }),
+    ).rejects.toBeInstanceOf(MindsHttpError);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   it('reports a resumable cursor on timeout', async () => {
@@ -233,6 +313,42 @@ describe('retries', () => {
     replies = [{ status: 400, body: { code: 'alias_mind_mismatch' } }];
     await expect(transport().ensureConversation('a')).rejects.toBeInstanceOf(MindsHttpError);
     expect(calls).toHaveLength(1);
+  });
+
+  it('honours retry_after from the JSON body, not only from the header', async () => {
+    replies = [
+      { status: 429, body: { retry_after: 0, message: 'slow' } },
+      { status: 200, body: { conversationId: 'c' } },
+    ];
+    const started = Date.now();
+    expect((await transport().ensureConversation('a')).conversationId).toBe('c');
+    // Without body support this would fall back to the fixed 1000 ms budget.
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it('clamps an absurd Retry-After instead of parking the process for a day', async () => {
+    vi.useFakeTimers();
+    try {
+      const notes: string[] = [];
+      replies = [
+        { status: 429, body: { message: 'slow' }, headers: { 'retry-after': '86400' } },
+        { status: 200, body: { conversationId: 'c' } },
+      ];
+      const t = new MessagingApiTransport({
+        builderApiKey: 'key-123',
+        mindId: 'mind-abc',
+        baseUrl: 'https://api.build.hellominds.ai',
+        authHeader: 'x-api-key',
+        statePath,
+        onNote: (n) => notes.push(n),
+      });
+      const pending = t.ensureConversation('a');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect((await pending).conversationId).toBe('c');
+      expect(notes.join('\n')).toContain('retrying in 30000ms');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

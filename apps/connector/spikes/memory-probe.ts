@@ -23,7 +23,7 @@ import { z } from 'zod';
 
 import { argFlag, argValue, loadSpikeEnv } from './_shared/env.js';
 import { appendToApiNotes } from './_shared/notes.js';
-import { fenced, reporter, shortId, type SpikeReporter } from './_shared/report.js';
+import { reporter, shortId, type SpikeReporter } from './_shared/report.js';
 import { readSpikeState, STATE_PATH, writeSpikeState } from './_shared/state.js';
 import {
   exchange,

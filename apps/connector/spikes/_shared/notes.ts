@@ -51,7 +51,7 @@ export function appendToApiNotes(markdown: string, meta: NotesMeta): string {
   parts.push(
     `**Result:** \`${meta.verdict}\` · code \`${meta.code}\` · class \`${meta.cls ?? 'NONE'}\`` +
       (meta.durationMs === undefined ? '' : ` · ran ${(meta.durationMs / 1000).toFixed(1)}s`) +
-      ` · **LIVE-VERIFIED** (produced by \`pnpm spike:${scriptName(meta.spike)}\`).`,
+      ` · ${confidence(meta)} (produced by \`pnpm spike:${scriptName(meta.spike)}\`).`,
   );
   if (meta.context && Object.keys(meta.context).length > 0) {
     parts.push('');
@@ -79,6 +79,16 @@ function ensureFile(): void {
     // Append the section rather than rewriting anything above it.
     appendFileSync(API_NOTES_PATH, `\n\n---\n\n${LIVE_SECTION_HEADING}\n`, 'utf8');
   }
+}
+
+/**
+ * This file defines LIVE-VERIFIED as "a spike did this and it worked". A failed run must
+ * therefore never claim it — it is evidence of a failure, not of a working call.
+ */
+function confidence(meta: NotesMeta): string {
+  if (meta.verdict === 'PASS') return '**LIVE-VERIFIED**';
+  if (meta.cls === 'PRECONDITION') return '**NOT RUN** — precondition failure, no platform verdict';
+  return '**LIVE-OBSERVED FAILURE**';
 }
 
 function scriptName(spike: string): string {

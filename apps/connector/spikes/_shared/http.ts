@@ -80,7 +80,7 @@ export async function rawRequest(req: RawRequest): Promise<RawResponse> {
       networkError: null,
     };
   } catch (error) {
-    const err = error as Error & { cause?: { code?: string } };
+    const err = error as Error;
     return {
       method,
       url,
@@ -93,11 +93,38 @@ export async function rawRequest(req: RawRequest): Promise<RawResponse> {
       jsonParseError: null,
       networkError: {
         name: err.name,
-        message: err.message,
-        code: err.cause?.code ?? null,
+        // Node hides the useful part ("fetch failed") one or two levels down.
+        message: [err.message, causeMessage(error)].filter(Boolean).join(' <- '),
+        code: errorCode(error),
       },
     };
   }
+}
+
+/** Digs ECONNREFUSED / ENOTFOUND / ETIMEDOUT out of fetch's nested cause chain. */
+function errorCode(error: unknown): string | null {
+  const seen = new Set<unknown>();
+  const walk = (value: unknown, depth: number): string | null => {
+    if (depth > 4 || value === null || typeof value !== 'object' || seen.has(value)) return null;
+    seen.add(value);
+    const node = value as { code?: unknown; cause?: unknown; errors?: unknown };
+    if (typeof node.code === 'string') return node.code;
+    if (Array.isArray(node.errors)) {
+      for (const child of node.errors) {
+        const found = walk(child, depth + 1);
+        if (found !== null) return found;
+      }
+    }
+    return walk(node.cause, depth + 1);
+  };
+  return walk(error, 0);
+}
+
+function causeMessage(error: unknown): string | null {
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause === null || cause === undefined) return null;
+  if (cause instanceof Error) return cause.message;
+  return typeof cause === 'string' ? cause : null;
 }
 
 /** A one-line summary suitable for a FAIL message. */

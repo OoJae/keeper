@@ -136,6 +136,23 @@ export interface MindClient {
   config: MindClientConfig;
 }
 
+/**
+ * The returned config carries the Builder API key, and spikes append their output to
+ * docs/API-NOTES.md and docs/EVIDENCE/ in a PUBLIC repo. A single `console.log(client.config)`
+ * would commit the key, so redact it on both paths that can print an object:
+ * JSON.stringify (toJSON) and console.log / util.inspect (the inspect symbol).
+ * The real key stays readable as a normal property for code that needs it.
+ */
+function withRedactedKey(config: MindClientConfig): MindClientConfig {
+  const redacted = (): Record<string, unknown> => ({ ...config, builderApiKey: '[redacted]' });
+  Object.defineProperty(config, 'toJSON', { value: redacted, enumerable: false });
+  Object.defineProperty(config, Symbol.for('nodejs.util.inspect.custom'), {
+    value: redacted,
+    enumerable: false,
+  });
+  return config;
+}
+
 /** The one construction path product code uses. Spikes may build transports directly. */
 export function createMindClient(cfg: Partial<MindClientConfig> = {}): MindClient {
   const config = loadMindClientConfig(cfg);
@@ -153,5 +170,9 @@ export function createMindClient(cfg: Partial<MindClientConfig> = {}): MindClien
           requestTimeoutMs: config.requestTimeoutMs,
         });
 
-  return { transport: withCallLog(base, log, { creditSampling: config.creditSampling }), log, config };
+  return {
+    transport: withCallLog(base, log, { creditSampling: config.creditSampling }),
+    log,
+    config: withRedactedKey(config),
+  };
 }
