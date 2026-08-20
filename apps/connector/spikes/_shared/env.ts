@@ -35,16 +35,36 @@ export const VAR_DIR = join(REPO_ROOT, 'var');
 
 // --- secrets ---------------------------------------------------------------
 
-const SECRETS = new Set<string>();
+/** value -> what to print instead. */
+const REDACTIONS = new Map<string, string>();
 
 /** Any value registered here is scrubbed from printed output and from API-NOTES. */
 export function registerSecret(value: string | undefined | null): void {
-  if (typeof value === 'string' && value.trim().length >= 6) SECRETS.add(value.trim());
+  register(value, 6, () => '***REDACTED***');
+}
+
+/**
+ * Mind ids are not credentials, but docs/API-NOTES.md is committed to a PUBLIC repo and
+ * this harness's own convention there is the truncated form (report.ts `shortId`). Our own
+ * writes already use it — but a Mind's verbatim reply does not, and a Mind states its own
+ * id readily ("your builder key is … and mind <full id>"), so the full id walks straight
+ * into the committed file. Mask it to the SAME truncated form so the doc stays readable
+ * and consistent instead of sprouting ***REDACTED*** in the middle of evidence.
+ */
+export function registerIdentifier(value: string | undefined | null): void {
+  register(value, 12, (v) => `${v.slice(0, 8)}\u2026${v.slice(-2)}`);
+}
+
+function register(value: string | undefined | null, minLength: number, mask: (v: string) => string): void {
+  if (typeof value !== 'string') return;
+  const trimmed = value.trim();
+  if (trimmed.length < minLength) return;
+  REDACTIONS.set(trimmed, mask(trimmed));
 }
 
 export function redact(text: string): string {
   let out = text;
-  for (const secret of SECRETS) out = out.split(secret).join('***REDACTED***');
+  for (const [value, mask] of REDACTIONS) out = out.split(value).join(mask);
   return out;
 }
 
@@ -138,7 +158,18 @@ const AUTH_HEADER_VALUES = ['x-api-key', 'x-access-key', 'auto'] as const;
  */
 export function loadSpikeEnv(required: string[], r?: SpikeReporter): SpikeEnv {
   const envFileExists = existsSync(ENV_PATH);
-  if (envFileExists) dotenv.config({ path: ENV_PATH });
+  const loaded = envFileExists ? dotenv.config({ path: ENV_PATH }) : undefined;
+
+  // Register redactions BEFORE anything can be printed. Everything key-shaped that our own
+  // .env declares is scrubbed, not just the vars this particular spike happens to require:
+  // a Mind can quote back anything we ever put on the wire, and API-NOTES is committed.
+  for (const [name, value] of Object.entries(loaded?.parsed ?? {})) {
+    if (/KEY|TOKEN|SECRET|PASSWORD/i.test(name)) registerSecret(value);
+  }
+  registerSecret(process.env['MINDS_BUILDER_API_KEY']);
+  registerSecret(process.env['MINDS_ACCESS_KEY']);
+  registerIdentifier(process.env['MINDS_MIND_ID']);
+  registerIdentifier(process.env['MINDS_REWARDS_MIND_ID']);
 
   const shape: Record<string, typeof NON_EMPTY> = {};
   for (const name of required) shape[name] = NON_EMPTY;
@@ -166,9 +197,6 @@ export function loadSpikeEnv(required: string[], r?: SpikeReporter): SpikeEnv {
   for (const name of required) {
     if (/KEY|TOKEN|SECRET/.test(name)) registerSecret(process.env[name]);
   }
-  // Always scrub the builder key, even when a spike did not require it.
-  registerSecret(process.env['MINDS_BUILDER_API_KEY']);
-  registerSecret(process.env['MINDS_ACCESS_KEY']);
 
   // The adapter reads MINDS_AUTH_HEADER straight out of process.env and rejects anything
   // that is not one of three LOWERCASE literals — including "X-Api-Key", which is exactly

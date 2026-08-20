@@ -6,6 +6,19 @@
  * human introduction, and the actual A2A hop rides email or a shared Telegram group — which
  * is why the timeout here is 10 minutes, not 2.
  *
+ * WHAT IT CAN PROVE. A random token is planted in the REWARDS Mind's own conversation and
+ * never uttered to the Steward. The Steward is then asked to fetch "the Keeper relay
+ * token". If that exact token comes back out of the Steward's conversation, information
+ * really did move between the two Minds — a Steward that stalls, echoes our wording, or
+ * simply asserts "done" cannot produce it.
+ *
+ * WHAT IT CANNOT PROVE. That the token travelled over a Circle specifically, rather than
+ * shared platform memory or the human who did the introduction; that the hop repeats
+ * unattended; or that it is fast enough for a live demo beat. BUILD_PLAN §5 wants the
+ * chain to run twice in a row without intervention — one PASS here is necessary, not
+ * sufficient. On the failure path the spike re-queries the Rewards Mind: if the token is
+ * gone, the run is reported INCONCLUSIVE rather than as a blocked relay.
+ *
  * This result is the direct input to the BUILD_PLAN §12 descope decision
  * (Descope Plan A: single-agent Keeper), whose deadline is Aug 24 EOD.
  */
@@ -18,6 +31,7 @@ import { describe, fetchMindDetail, summarizeResponse, type BuilderMind } from '
 import { appendToApiNotes } from './_shared/notes.js';
 import { fenced, reporter, shortId, type SpikeReporter } from './_shared/report.js';
 import {
+  exchange,
   failSpike,
   healthGate,
   humanAction,
@@ -30,15 +44,21 @@ import {
 const r: SpikeReporter = reporter('circle-probe');
 const RELAY_TIMEOUT_MS = 10 * 60 * 1000;
 const POLL_MS = 15_000;
+const PRIME_TIMEOUT_MS = 120_000;
 /**
- * The phrase we grade for is INSIDE the request we send ("ask it to reply with X"), so a
- * Steward that merely acknowledges — "sure, I'll ask them for X" — contains the phrase
- * without any relay having happened. Grading that as a PASS would feed the §12 descope
- * decision a capability the platform may not have. So: an occurrence that arrives in the
- * first ECHO_GRACE_MS is treated as an echo of our own words, recorded verbatim as
- * evidence, and NOT as proof. A real relay rides email/Telegram and takes minutes.
+ * A time window alone CANNOT establish a relay, and an earlier version of this spike
+ * tried: it put the graded phrase inside its own request to the Steward ("ask them to
+ * reply with X") and then credited any occurrence that arrived more than ECHO_GRACE_MS
+ * later. A Steward that simply waited and repeated our own word — or hallucinated that
+ * it had asked — scored a PASS with the Rewards Mind never contacted, and wrote
+ * "relay ACHIEVED · Phase 5 stays in scope" into the §12 decision document.
+ *
+ * So the graded token is now something the Steward CANNOT know: it is planted in the
+ * REWARDS Mind's own conversation first, and never appears in anything we say to the
+ * Steward. The Steward can only produce it by actually getting it from the other Mind.
+ * The window below survives only as a plausibility warning on the evidence.
  */
-const ECHO_GRACE_MS = 60_000;
+const SUSPICIOUSLY_FAST_MS = 60_000;
 
 const REFUSAL = /\b(can'?t|cannot|unable|not able|don'?t have|do not have|no ability|not permitted|no access)\b/i;
 
@@ -55,11 +75,15 @@ interface Ctx {
   rewards: Party | null;
   f0: string | null;
   requestedAtMs: number;
+  primeAck: string | null;
   firstReply: string | null;
   refusal: string | null;
-  earlyEcho: { at: string; text: string } | null;
+  suspiciouslyFast: { at: string; text: string } | null;
   hit: MindHistoryMessage | null;
   mindMessages: string[];
+  /** Control run on the failure path: does the Rewards Mind still hold the token? */
+  rewardsStillHoldsToken: boolean | null;
+  rewardsControlReply: string | null;
 }
 
 const ctx: Ctx = {
@@ -67,11 +91,14 @@ const ctx: Ctx = {
   rewards: null,
   f0: null,
   requestedAtMs: 0,
+  primeAck: null,
   firstReply: null,
   refusal: null,
-  earlyEcho: null,
+  suspiciouslyFast: null,
   hit: null,
   mindMessages: [],
+  rewardsStillHoldsToken: null,
+  rewardsControlReply: null,
 };
 
 async function main(): Promise<void> {
@@ -84,8 +111,14 @@ async function main(): Promise<void> {
   const stewardId = env.get('MINDS_MIND_ID');
   const rewardsId = env.get('MINDS_REWARDS_MIND_ID');
   const nonce = randomBytes(3).toString('hex').toUpperCase();
-  const phrase = `RELAY-OK-${nonce}`;
+  /**
+   * Planted in the Rewards Mind ONLY. Never sent to the Steward, never printed in the
+   * human-introduction copy-paste block. If it comes back out of the Steward's
+   * conversation, information genuinely moved between the two Minds.
+   */
+  const secret = `RELAY-TOKEN-${randomBytes(4).toString('hex').toUpperCase()}`;
   const alias = `keeper-circle-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  const rewardsAlias = `keeper-circle-rewards-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${nonce.toLowerCase()}`;
 
   if (stewardId === rewardsId) {
     r.fail(
@@ -98,9 +131,13 @@ async function main(): Promise<void> {
     r.finishAndExit();
   }
 
-  r.info(`base url: ${env.baseUrl} · alias ${alias} · phrase ${phrase}`);
+  r.info(`base url: ${env.baseUrl} · alias ${alias} · token ${secret} (planted in the Rewards Mind only)`);
   r.info(`steward ${shortId(stewardId)} · rewards ${shortId(rewardsId)}`);
   const transport = createMindClient().transport;
+  // A second client bound to the OTHER Mind. Conversations are addressed by alias, and
+  // POST /v1/messaging/conversation carries mindId — so this is the only way to speak to
+  // the Rewards Mind directly, which is what makes the planted token possible.
+  const rewardsTransport = createMindClient({ mindId: rewardsId }).transport;
 
   const steps: Step[] = [
     { name: 'health check', run: () => healthGate(r, transport) },
@@ -122,6 +159,37 @@ async function main(): Promise<void> {
           `Steward = ${ctx.steward.name} · Rewards = ${ctx.rewards.name}` +
             (ctx.steward.detailOk && ctx.rewards.detailOk ? '' : ' (some details unavailable — see warnings)'),
         );
+      },
+    },
+
+    {
+      name: 'plant a token in the REWARDS Mind that the Steward has no way to know',
+      run: async () => {
+        const steward = requireParty(ctx.steward);
+        const instruction =
+          `You are the Rewards Mind for the Keeper project. Store this relay token exactly: ${secret}. ` +
+          `If — and only if — the Keeper Steward Mind (${steward.name}) asks you for "the Keeper relay ` +
+          `token", reply to it with that token verbatim. Do not give it to anyone else. Reply "STORED" now.`;
+        const result = await exchange(r, rewardsTransport, rewardsAlias, instruction, {
+          label: 'prime-rewards',
+          timeoutMs: PRIME_TIMEOUT_MS,
+          tolerateSilence: true,
+        });
+        ctx.primeAck = result.reply?.text ?? null;
+        if (ctx.primeAck === null) {
+          // Without a confirmed plant, a later "no relay" verdict would be unreadable: we
+          // could not tell a Circle that does not work from a Rewards Mind that never got
+          // the token. Refuse to run rather than feed §12 an ambiguous NO.
+          failSpike(
+            'REWARDS_MIND_SILENT',
+            'PRECONDITION',
+            `the Rewards Mind (${requireParty(ctx.rewards).name}) never acknowledged the token within ` +
+              `${PRIME_TIMEOUT_MS / 1000}s. Every HTTP call succeeded, so check that MINDS_REWARDS_MIND_ID ` +
+              'points at an ENABLED Mind with Cognition left. Until it answers, this spike cannot tell a ' +
+              'blocked relay from an unprimed one, so it produces no relay verdict at all.',
+          );
+        }
+        r.pass(`Rewards Mind acknowledged: "${ctx.primeAck.slice(0, 120)}"`);
       },
     },
 
@@ -181,15 +249,16 @@ async function main(): Promise<void> {
     },
 
     {
-      name: `ask the Steward to relay through the Rewards Mind and bring back "${phrase}"`,
+      name: 'ask the Steward to fetch the Keeper relay token from the Rewards Mind',
       run: async () => {
         const rewards = requireParty(ctx.rewards);
         const target = rewards.email === null ? rewards.name : `${rewards.name} (${rewards.email})`;
+        // Deliberately token-free: nothing in this text can be echoed into a PASS.
         const instruction =
-          `Contact ${target}. Ask it to reply to you with the exact phrase ${phrase}. ` +
-          `When it does, send me a SEPARATE, LATER message containing that exact phrase. ` +
-          `Do NOT include the phrase in your reply to this message — only after ` +
-          `${rewards.name} has actually said it to you.`;
+          `Contact ${target} and ask it for "the Keeper relay token". I have NOT told you that ` +
+          `token and you must not guess or invent one. Once ${rewards.name} has actually told it ` +
+          `to you, send me a SEPARATE, LATER message containing the token verbatim. If you cannot ` +
+          `reach ${rewards.name}, say so plainly instead.`;
         r.info(`-> ${instruction}`);
         const sent = await transport.send(alias, instruction);
         ctx.requestedAtMs = sent.sentAt.getTime();
@@ -210,28 +279,16 @@ async function main(): Promise<void> {
           label: 'relay',
           match: (message) => {
             if (message.sender !== 'mind') return false;
-            if (!(message.text ?? '').toUpperCase().includes(phrase)) return false;
-            // Our own request carries the phrase, so an immediate acknowledgement echoes it
-            // back with no relay behind it. Only an occurrence separated from the request
-            // by ECHO_GRACE_MS counts. Messages without a timestamp are dated by arrival,
-            // which is the correct reading here: we only see them when we poll.
-            const at = message.at instanceof Date ? message.at.getTime() : Date.now();
-            return at >= ctx.requestedAtMs + ECHO_GRACE_MS;
+            // The token is the whole proof: it was never in anything we said to this Mind.
+            // Timing is no longer load-bearing, so an absent server timestamp cannot be
+            // laundered into "it must have arrived late" the way it used to be.
+            return (message.text ?? '').toUpperCase().includes(secret);
           },
           onOther: (message) => {
             if (message.sender !== 'mind') return;
             const text = (message.text ?? '').trim();
             if (text === '') return;
             ctx.mindMessages.push(text);
-            if (text.toUpperCase().includes(phrase) && ctx.earlyEcho === null) {
-              const at = message.at instanceof Date ? message.at.toISOString() : 'unknown time';
-              ctx.earlyEcho = { at, text };
-              r.warn(
-                `the phrase came back within ${ECHO_GRACE_MS / 1000}s of our request (${at}) — ` +
-                  'that reads as the Steward echoing our own words, not as a completed relay. ' +
-                  'NOT counted as proof. Still listening for a later, separate message.',
-              );
-            }
             if (ctx.firstReply === null) {
               ctx.firstReply = text;
               r.plain('');
@@ -251,25 +308,54 @@ async function main(): Promise<void> {
 
         if (outcome.matched !== null) {
           ctx.hit = outcome.matched;
-          r.pass(`relay completed — Steward returned "${phrase}"`);
+          const at = outcome.matched.at instanceof Date ? outcome.matched.at.getTime() : null;
+          if (at !== null && at < ctx.requestedAtMs + SUSPICIOUSLY_FAST_MS) {
+            ctx.suspiciouslyFast = {
+              at: new Date(at).toISOString(),
+              text: outcome.matched.text ?? '',
+            };
+            r.warn(
+              `the token came back ${Math.round((at - ctx.requestedAtMs) / 1000)}s after the request — ` +
+                `faster than an email/Telegram hop plausibly is. It still counts (we never told the ` +
+                `Steward this token), but check the two Minds are not simply sharing one memory.`,
+            );
+          }
+          r.pass(`the Steward produced a token it was never given: "${secret}"`);
           return;
         }
 
+        // Control: if the Rewards Mind no longer holds the token, a "no relay" verdict here
+        // would be OUR bug, not the platform's — and it would argue for descoping Phase 5
+        // on false evidence. Check before pronouncing.
+        const control = await exchange(r, rewardsTransport, rewardsAlias,
+          'What is the Keeper relay token? Reply with the token only.', {
+            label: 'rewards-control',
+            timeoutMs: PRIME_TIMEOUT_MS,
+            tolerateSilence: true,
+          });
+        ctx.rewardsControlReply = control.reply?.text ?? null;
+        ctx.rewardsStillHoldsToken = (ctx.rewardsControlReply ?? '').toUpperCase().includes(secret);
+        if (!ctx.rewardsStillHoldsToken) {
+          failSpike(
+            'REWARDS_MIND_FORGOT',
+            'PRECONDITION',
+            `INCONCLUSIVE, not a relay verdict: the Rewards Mind can no longer produce the token we ` +
+              `planted (it answered "${ctx.rewardsControlReply ?? '<nothing>'}"). The Steward therefore ` +
+              'had nothing to fetch, and this run says NOTHING about whether Mind->Mind relay works. ' +
+              'Do NOT feed it into the §12 descope decision. Re-run once the Rewards Mind reliably ' +
+              'holds what it is told.',
+          );
+        }
         const verbatim = ctx.refusal ?? ctx.firstReply;
         failSpike(
           'CIRCLE_BLOCKED',
           'MIND',
-          `the Steward never returned "${phrase}" within ${RELAY_TIMEOUT_MS / 60_000} minutes ` +
-            `(${ctx.mindMessages.length} Mind message(s) seen). ` +
-            (ctx.earlyEcho === null
-              ? ''
-              : `It DID echo the phrase back ${Math.round(
-                  (new Date(ctx.earlyEcho.at).getTime() - ctx.requestedAtMs) / 1000,
-                )}s after our request — that is our own wording coming back, not a relay, so it ` +
-                `was not counted. Judge it yourself: "${ctx.earlyEcho.text}". `) +
+          `the Steward never produced the token within ${RELAY_TIMEOUT_MS / 60_000} minutes ` +
+            `(${ctx.mindMessages.length} Mind message(s) seen), and the Rewards Mind still holds it — ` +
+            'so there was something to fetch and it was not fetched. ' +
             (verbatim === null
-              ? 'It said nothing else at all.'
-              : `Its own words, verbatim: "${verbatim}"`) +
+              ? 'The Steward said nothing at all.'
+              : `The Steward's own words, verbatim: "${verbatim}"`) +
             ' Every HTTP call succeeded — this is about agent-to-agent reach, not the transport.',
         );
       },
@@ -279,7 +365,7 @@ async function main(): Promise<void> {
   await runSteps(r, steps);
   epilogue();
 
-  const path = appendToApiNotes(buildNotes(phrase), {
+  const path = appendToApiNotes(buildNotes(secret), {
     spike: 'circle-probe',
     verdict: r.verdict(),
     code: r.code(),
@@ -287,9 +373,10 @@ async function main(): Promise<void> {
     durationMs: r.elapsedMs(),
     context: {
       alias,
+      rewardsAlias,
       steward: ctx.steward?.name ?? shortId(stewardId),
       rewards: ctx.rewards?.name ?? shortId(rewardsId),
-      phrase,
+      plantedToken: secret,
       timeoutMinutes: RELAY_TIMEOUT_MS / 60_000,
     },
   });
@@ -338,19 +425,26 @@ function epilogue(): void {
   r.plain('─────────── INPUT TO THE §12 DESCOPE DECISION (deadline Aug 24 EOD) ───────────');
   r.plain('');
   if (ctx.hit !== null) {
-    r.plain('  Steward -> Rewards relay WORKS. Phase 5 (Circles + on-chain reward) stays in scope.');
+    r.plain('  The Steward produced a token that was planted ONLY in the Rewards Mind and never');
+    r.plain('  said to the Steward by us. Information really did cross between the two Minds.');
+    r.plain('');
+    r.plain('  WHAT THIS PROVES: a token reachable only through the other Mind came back.');
+    r.plain('  WHAT IT DOES NOT PROVE: (a) that it travelled over a Circle rather than shared');
+    r.plain('  platform memory or the human who did the introduction; (b) that it repeats');
+    r.plain('  unattended; (c) that it is fast enough for a live demo beat. §5 acceptance is');
+    r.plain('  "runs TWICE in a row without intervention" — run this again before believing it.');
+    r.plain('');
     r.plain('  Note how long it took: A2A rides email/Telegram, so build the demo beat around');
     r.plain('  that latency (pre-trigger it, or narrate "Keeper considers, then acts").');
-  } else if (ctx.earlyEcho !== null) {
-    r.plain('  The Steward repeated our phrase back almost immediately and then nothing else');
-    r.plain('  arrived. Our request contains that phrase, so the echo proves NOTHING about');
-    r.plain('  whether the Rewards Mind was ever reached — it was deliberately not graded.');
-    r.plain('  Read the verbatim text above. If you believe a relay really did happen that');
-    r.plain(`  fast, re-run and watch the two Minds' own inboxes; otherwise treat this as a`);
-    r.plain('  non-relay and follow the descope guidance below.');
-    r.plain('');
-    r.plain('  Per BUILD_PLAN §12, if this is not demo-stable by Aug 24 EOD, execute');
-    r.plain('  Descope Plan A: single Steward Mind, rewards become recommendations.');
+  } else if (ctx.requestedAtMs === 0) {
+    r.plain('  The run never got as far as asking the Steward for the token, so there is NO relay');
+    r.plain('  verdict here at all — do not feed this run into the §12 decision. Fix whatever');
+    r.plain('  failed above and re-run.');
+  } else if (ctx.rewardsStillHoldsToken === false) {
+    r.plain('  INCONCLUSIVE — this is NOT a relay verdict and must not feed the §12 decision.');
+    r.plain('  The Rewards Mind could not produce the token we planted in it, so the Steward');
+    r.plain('  had nothing to fetch. Fix the Rewards Mind (enabled? Cognition left? does it');
+    r.plain('  retain what it is told?) and re-run before drawing any conclusion.');
   } else {
     r.plain('  Steward -> Rewards relay did NOT complete. Per BUILD_PLAN §12, if this is not');
     r.plain('  demo-stable by Aug 24 EOD, execute Descope Plan A without sentimentality:');
@@ -370,40 +464,75 @@ function epilogue(): void {
   r.plain('──────────────────────────────────────────────────────────────────────────────');
 }
 
-function buildNotes(phrase: string): string {
+function buildNotes(secret: string): string {
+  const notAttempted = ctx.hit === null && ctx.requestedAtMs === 0;
+  const inconclusive = ctx.rewardsStillHoldsToken === false;
   const parts: string[] = [];
   parts.push(
-    `**Mind -> Mind relay: ${ctx.hit === null ? 'NOT achieved' : 'ACHIEVED'}.** ` +
-      `Steward was asked to contact the Rewards Mind and bring back \`${phrase}\`; ` +
-      `we listened for ${RELAY_TIMEOUT_MS / 60_000} minutes.`,
+    `**Mind -> Mind relay: ${
+      ctx.hit !== null
+        ? 'ACHIEVED'
+        : notAttempted
+          ? 'NOT TESTED (the run stopped before the request)'
+          : inconclusive
+            ? 'INCONCLUSIVE (the Rewards Mind did not retain the token)'
+            : 'NOT achieved'
+    }.** ` +
+      `Token \`${secret}\` was planted in the REWARDS Mind's own conversation and never said to ` +
+      `the Steward; the Steward was asked to fetch "the Keeper relay token" and we listened for ` +
+      `${RELAY_TIMEOUT_MS / 60_000} minutes.`,
   );
   parts.push(
     'Setup required a human introduction first (email CC or a shared Telegram group) — ' +
       'confirming that there is no programmatic A2A path today.',
   );
+  if (ctx.primeAck !== null) {
+    parts.push(`Rewards Mind's acknowledgement of the planted token:\n\n${fenced(ctx.primeAck, 'text')}`);
+  }
   if (ctx.firstReply !== null) {
     parts.push(`Steward's first reply, verbatim:\n\n${fenced(ctx.firstReply, 'text')}`);
-  }
-  if (ctx.earlyEcho !== null) {
-    parts.push(
-      `**Echo, not relay.** The phrase came back at \`${ctx.earlyEcho.at}\`, within ` +
-        `${ECHO_GRACE_MS / 1000}s of our request — the request itself contains the phrase, so ` +
-        'this is the Steward repeating our wording, and it was NOT graded as a completed ' +
-        `relay:\n\n${fenced(ctx.earlyEcho.text, 'text')}`,
-    );
   }
   if (ctx.refusal !== null && ctx.refusal !== ctx.firstReply) {
     parts.push(`Steward's refusal, verbatim:\n\n${fenced(ctx.refusal, 'text')}`);
   }
   if (ctx.hit !== null) {
     const at = ctx.hit.at instanceof Date ? ctx.hit.at.toISOString() : 'unknown time';
+    parts.push(`Token returned by the Steward at \`${at}\`:\n\n${fenced(ctx.hit.text ?? '', 'text')}`);
+    if (ctx.suspiciouslyFast !== null) {
+      parts.push(
+        `**Plausibility warning.** It arrived within ${SUSPICIOUSLY_FAST_MS / 1000}s of the request, ` +
+          'faster than an email/Telegram hop plausibly is. It is still counted (the Steward was ' +
+          'never told this token), but check the two Minds are not sharing one memory.',
+      );
+    }
     parts.push(
-      `Relayed phrase received at \`${at}\`, ` +
-        `${Math.round(((ctx.hit.at instanceof Date ? ctx.hit.at.getTime() : Date.now()) - ctx.requestedAtMs) / 1000)}s ` +
-        `after the request (echo window was ${ECHO_GRACE_MS / 1000}s):\n\n${fenced(ctx.hit.text ?? '', 'text')}`,
+      '**What this does and does not establish.** Establishes: a value reachable only through ' +
+        'the Rewards Mind came back out of the Steward. Does NOT establish that it travelled over ' +
+        'a Circle rather than shared platform memory or the human introducer, that it repeats ' +
+        'unattended, or that it is fast enough for a live beat. BUILD_PLAN §5 requires the chain ' +
+        'to run **twice in a row without intervention** — run this spike again before relying on it.',
     );
-    parts.push('**§12 decision input:** Phase 5 (Circles + on-chain reward) stays in scope.');
+    parts.push('**§12 decision input:** Phase 5 (Circles + on-chain reward) stays in scope, pending a second run.');
+  } else if (notAttempted) {
+    parts.push(
+      '**§12 decision input: NONE.** The Steward was never asked for the token — see the failure ' +
+        'above. Nothing here says anything about agent-to-agent reach.',
+    );
+  } else if (inconclusive) {
+    parts.push(
+      `Control check: asked the Rewards Mind for the token back and it answered ` +
+        `${fenced(ctx.rewardsControlReply ?? '<nothing>', 'text')}`,
+    );
+    parts.push(
+      '**§12 decision input: NONE.** The Rewards Mind never retained the planted token, so the ' +
+        'Steward had nothing to fetch and no conclusion about A2A reach can be drawn. Do not ' +
+        'descope on this run.',
+    );
   } else {
+    parts.push(
+      'Control check passed: the Rewards Mind could still produce the planted token on request, ' +
+        'so there WAS something for the Steward to fetch and it did not fetch it.',
+    );
     parts.push(
       '**§12 decision input:** if this is not demo-stable by **Aug 24 EOD**, execute Descope ' +
         'Plan A — single Steward Mind, rewards become autonomous *recommendations* in the digest, ' +

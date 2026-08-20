@@ -40,6 +40,20 @@ export interface RawResponse {
   readonly networkError: { name: string; message: string; code: string | null } | null;
 }
 
+/**
+ * Same budget the adapter uses, from the same env var (minds-client config.ts reads
+ * MINDS_REQUEST_TIMEOUT_MS with a 30s default). A raw probe that gives up SOONER than the
+ * transport it is vetting reports ENDPOINT_UNREACHABLE — "no HTTP response at all" — for a
+ * platform the transport would have talked to happily, and that is a transport NO-GO on a
+ * platform that is merely slow. An operator who raises the var because the beta platform
+ * is sluggish must move both budgets, not one.
+ */
+export function rawRequestTimeoutMs(): number {
+  const raw = (process.env['MINDS_REQUEST_TIMEOUT_MS'] ?? '').trim();
+  const parsed = Number(raw);
+  return raw !== '' && Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 30_000;
+}
+
 export async function rawRequest(req: RawRequest): Promise<RawResponse> {
   const method = req.method ?? 'GET';
   const url = `${req.baseUrl.replace(/\/+$/, '')}${req.path}`;
@@ -55,7 +69,7 @@ export async function rawRequest(req: RawRequest): Promise<RawResponse> {
       method,
       headers,
       body: req.body === undefined ? undefined : JSON.stringify(req.body),
-      signal: AbortSignal.timeout(req.timeoutMs ?? 20_000),
+      signal: AbortSignal.timeout(req.timeoutMs ?? rawRequestTimeoutMs()),
     });
     const bodyText = await response.text();
     let json: unknown = null;
@@ -127,11 +141,45 @@ function causeMessage(error: unknown): string | null {
   return typeof cause === 'string' ? cause : null;
 }
 
+/**
+ * Is this response the platform refusing our credentials? Mirrors `MindsHttpError.isAuth`
+ * in @keeper/minds-client so the raw probe and the adapter cannot disagree about the same
+ * response. The 400 branch is not defensive padding: LIVE-VERIFIED 2026-08-20, a request
+ * the platform considers unauthenticated answers **400**, not 401 —
+ *   {"error":{"type":"BAD_INPUT","subType":"VALIDATION_FAILED",
+ *             "message":"Authentication required: x-api-key header required in build mode"}}
+ * Read as a plain HTTP_ERROR that is an INFRA NO-GO on the transport; read as AUTH it is
+ * "re-mint the key and re-run". Those are opposite day-1 decisions.
+ */
+export function isAuthRejection(response: RawResponse): boolean {
+  if (response.status === 401 || response.status === 403) return true;
+  if (response.status !== 400) return false;
+  return /authentication required/i.test(apiErrorMessage(response) ?? response.bodyText);
+}
+
+/** The platform's own error text, from either the nested or the flat error envelope. */
+export function apiErrorMessage(response: RawResponse): string | null {
+  const body = response.json;
+  if (typeof body !== 'object' || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const nested = rec['error'];
+  if (typeof nested === 'object' && nested !== null) {
+    const message = (nested as Record<string, unknown>)['message'];
+    if (typeof message === 'string') return message;
+  }
+  if (typeof nested === 'string') return nested;
+  return typeof rec['message'] === 'string' ? rec['message'] : null;
+}
+
 /** A one-line summary suitable for a FAIL message. */
 export function describe(response: RawResponse): string {
   if (response.networkError) {
     const code = response.networkError.code ?? response.networkError.name;
-    return `${response.method} ${response.url} produced no HTTP response (${code}: ${response.networkError.message})`;
+    const waited =
+      response.networkError.name === 'TimeoutError'
+        ? ` after ${(response.durationMs / 1000).toFixed(1)}s (raise MINDS_REQUEST_TIMEOUT_MS to wait longer)`
+        : '';
+    return `${response.method} ${response.url} produced no HTTP response${waited} (${code}: ${response.networkError.message})`;
   }
   const body = response.bodyText.trim() === '' ? '<empty body>' : truncate(response.bodyText, 500);
   return `${response.method} ${response.url} returned ${String(response.status)} ${body}`;
@@ -171,7 +219,7 @@ export async function rawRequestAuto(
   for (const header of authHeaderOrder(req.preference)) {
     const response = await rawRequest({ ...req, header });
     last = response;
-    if (response.status !== 401 && response.status !== 403) return response;
+    if (!isAuthRejection(response)) return response;
   }
   // Both headers were rejected; return the last attempt so the caller can report it.
   return last as RawResponse;

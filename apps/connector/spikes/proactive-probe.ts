@@ -10,7 +10,10 @@
  *   pnpm spike:proactive -- --phase=check   re-check after a crash, WITHOUT re-arming
  *
  * The immediate acknowledgement to the arming message is expected and ignored: what counts
- * is a NEW message carrying the codeword at or after the deadline.
+ * is a NEW message carrying the codeword, dated BY THE SERVER at or after the deadline.
+ * A record with no `createdAt` is never credited — arrival time is when we polled, not
+ * when the Mind wrote, and treating the two as the same turns any instant reply into
+ * "proof" of scheduling as soon as the deadline has passed.
  */
 import { randomBytes } from 'node:crypto';
 
@@ -52,6 +55,8 @@ interface Ctx {
   state: ArmedState | null;
   ackText: string | null;
   earlyLeak: { at: string; text: string } | null;
+  /** Codeword-bearing Mind messages the platform gave us with NO `createdAt`. */
+  untimed: string[];
   hit: MindHistoryMessage | null;
   messagesSeen: number;
   mindMessagesSeen: number;
@@ -61,6 +66,7 @@ const ctx: Ctx = {
   state: null,
   ackText: null,
   earlyLeak: null,
+  untimed: [],
   hit: null,
   messagesSeen: 0,
   mindMessagesSeen: 0,
@@ -232,22 +238,36 @@ function pollStep(transport: MindTransport): Step {
         match: (message) => {
           if (message.sender !== 'mind') return false;
           if (!containsCodeword(message.text, state.codeword)) return false;
-          const at = message.at instanceof Date ? message.at.getTime() : Date.now();
-          return at >= deadlineMs;
+          // The SERVER's clock is the only thing that can separate "the Mind waited and
+          // then wrote" from "the Mind answered instantly". Dating an untimestamped record
+          // by arrival time credits an immediate reply the moment the deadline passes:
+          // that is how `--phase=check` (and any run where history lags past the deadline)
+          // turned an instant echo into proof of self-scheduling. Refuse to guess.
+          if (!(message.at instanceof Date)) return false;
+          return message.at.getTime() >= deadlineMs;
         },
         onOther: (message) => {
           ctx.messagesSeen += 1;
           if (message.sender === 'mind') {
             ctx.mindMessagesSeen += 1;
             if (ctx.ackText === null) ctx.ackText = message.text ?? '';
-            if (containsCodeword(message.text, state.codeword) && ctx.earlyLeak === null) {
-              const at = message.at instanceof Date ? message.at.toISOString() : 'unknown time';
-              ctx.earlyLeak = { at, text: message.text ?? '' };
-              r.warn(
-                `the codeword appeared BEFORE the deadline (${at}) — the Mind leaked it in an ` +
-                  'immediate reply instead of scheduling. Still waiting for a message at/after ' +
-                  `${state.deadline}.`,
-              );
+            if (containsCodeword(message.text, state.codeword)) {
+              if (!(message.at instanceof Date)) {
+                ctx.untimed.push(message.text ?? '');
+                r.warn(
+                  'the codeword arrived on a record with NO server timestamp (`createdAt` absent). ' +
+                    'An instantly-sent message and a scheduled one are indistinguishable without ' +
+                    'one, so this CANNOT be counted as proof of self-scheduling. Still listening.',
+                );
+              } else if (ctx.earlyLeak === null) {
+                const at = message.at.toISOString();
+                ctx.earlyLeak = { at, text: message.text ?? '' };
+                r.warn(
+                  `the codeword appeared BEFORE the deadline (${at}) — the Mind leaked it in an ` +
+                    'immediate reply instead of scheduling. Still waiting for a message at/after ' +
+                    `${state.deadline}.`,
+                );
+              }
             }
           }
         },
@@ -262,6 +282,21 @@ function pollStep(transport: MindTransport): Step {
             `"${(outcome.matched.text ?? '').slice(0, 200)}"`,
         );
         return;
+      }
+
+      if (ctx.untimed.length > 0) {
+        failSpike(
+          'PROACTIVE_UNPROVABLE',
+          'MIND',
+          `the codeword DID come back (${ctx.untimed.length} time(s)) but every such record arrived ` +
+            'without a `createdAt`, so nothing in the data says when the Mind wrote it. This spike ' +
+            'will not date a message by when we happened to read it — history lag or a resumed ' +
+            '--phase=check would then turn an instant reply into "proof" of scheduling. ' +
+            `Verbatim, judge it yourself: "${ctx.untimed[0]}". This is NOT the agent misbehaving and ` +
+            'it does NOT block the transport GO/NO-GO: treat native scheduling as UNPROVEN, use the ' +
+            'connector-side trigger (BUILD_PLAN Phase 3 allows it), and ask at office hours whether ' +
+            'history can return message timestamps.',
+        );
       }
 
       failSpike(
@@ -292,9 +327,17 @@ function epilogue(): void {
   r.plain('──────────────────── PROACTIVITY: WHAT THIS MEANS ────────────────────');
   r.plain('');
   if (ctx.hit !== null) {
-    r.plain('  The Mind scheduled and sent its own message. Autonomy is NATIVE:');
-    r.plain('  the nightly digest and day-2 check-in (Phase 3) can be the Mind\'s own');
-    r.plain('  scheduling, with the connector only relaying. Say so on camera.');
+    r.plain('  The Mind scheduled and sent its own message, and the SERVER dated it at or after');
+    r.plain('  the requested time. Autonomy is NATIVE: the nightly digest and day-2 check-in');
+    r.plain('  (Phase 3) can be the Mind\'s own scheduling, with the connector only relaying.');
+    r.plain('  Say so on camera.');
+  } else if (ctx.untimed.length > 0) {
+    r.plain('  UNPROVEN, in either direction. The codeword came back, but on records the platform');
+    r.plain('  did not timestamp — and "when we read it" is not "when it was written". An instant');
+    r.plain('  reply and a scheduled one look identical from here, so nothing was credited.');
+    r.plain('  Do NOT claim native scheduling on camera on this evidence. Either get history to');
+    r.plain('  return `createdAt` (office hours), or use the connector-side trigger with the');
+    r.plain('  CONTENT still coming entirely from the Mind\'s memory.');
   } else if (ctx.earlyLeak !== null) {
     r.plain('  The Mind produced the codeword, but immediately — not at the requested time.');
     r.plain('  Reading: it can emit, it did not schedule. Look for a scheduling skill in the');
@@ -334,14 +377,30 @@ function buildNotes(): string {
         `the Mind emitted rather than scheduled:\n\n${fenced(ctx.earlyLeak.text, 'text')}`,
     );
   }
+  if (ctx.untimed.length > 0) {
+    parts.push(
+      `**Untimestamped — not counted.** ${ctx.untimed.length} Mind message(s) carried the codeword ` +
+        'on records with no `createdAt`. Without a server clock, an instant reply and a scheduled ' +
+        'one are the same bytes, and dating them by our own read time would manufacture proof ' +
+        `(a resumed \`--phase=check\` reads them all at once, after the deadline):\n\n${fenced(ctx.untimed[0] ?? '', 'text')}`,
+    );
+  }
   if (ctx.hit !== null) {
     const at = ctx.hit.at instanceof Date ? ctx.hit.at.toISOString() : 'unknown';
     parts.push(
-      `**Unprompted message** received at \`${at}\`:\n\n${fenced(ctx.hit.text ?? '', 'text')}`,
+      `**Unprompted message**, dated by the SERVER at \`${at}\` (requested at/after ` +
+        `\`${state.deadline}\`):\n\n${fenced(ctx.hit.text ?? '', 'text')}`,
     );
     parts.push(
       '**Consequence:** the Mind can schedule its own messages. Phase 3 autonomous follow-ups ' +
         'can be native rather than cron-faked.',
+    );
+  } else if (ctx.untimed.length > 0) {
+    parts.push(
+      '**Consequence: UNPROVEN in either direction** — not evidence that the Mind cannot ' +
+        'self-schedule, and not evidence that it can. Phase 3 should use the connector-side ' +
+        'trigger (content still from the Mind\'s memory) until history returns `createdAt`. ' +
+        'Office-hours question: can `GET /v1/messaging/histories/{alias}` include message timestamps?',
     );
   } else {
     parts.push(

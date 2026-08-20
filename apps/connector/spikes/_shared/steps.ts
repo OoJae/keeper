@@ -245,12 +245,66 @@ export function sleep(ms: number): Promise<void> {
  * before any Mind-level step can muddy the GO/NO-GO.
  */
 export async function healthGate(r: SpikeReporter, transport: MindTransport): Promise<void> {
+  requireMessagingApiTransport(transport);
   const health = await transport.healthCheck();
   r.raw('health-check', health);
   if (health.ok) {
     r.pass(`transport "${transport.kind}" is healthy (${health.class}) — ${health.detail}`);
     return;
   }
+  const failure = classifyHealthFailure(health);
+  failSpike(
+    failure.code,
+    failure.cls,
+    `health check failed (${health.class}${failure.status === null ? '' : `, HTTP ${failure.status}`}) — ` +
+      `${health.detail}. Nothing downstream of this can be trusted; fix the transport first.`,
+  );
+}
+
+/**
+ * Every Phase 0 spike probes the Messaging API and nothing else. The telegram-relay
+ * transport is a typed STUB (see packages/minds-client/src/transports/telegram-relay.ts):
+ * it throws on every operation and its healthCheck reports `UNREACHABLE`. Run a spike
+ * against it and the health gate below would translate our own MINDS_TRANSPORT setting
+ * into "ENDPOINT_UNREACHABLE / INFRA" — a platform NO-GO manufactured out of one line of
+ * .env, on a platform that may be perfectly healthy. Catch it first, as PRECONDITION.
+ */
+export function requireMessagingApiTransport(transport: MindTransport): void {
+  if (transport.kind === 'messaging-api') return;
+  failSpike(
+    'WRONG_TRANSPORT',
+    'PRECONDITION',
+    `MINDS_TRANSPORT selected the "${transport.kind}" transport, which is an unimplemented ` +
+      'stub — it reports itself as UNREACHABLE and throws on every call, so nothing it says ' +
+      'is a verdict on the Minds platform. FIX: set MINDS_TRANSPORT=messaging-api in .env ' +
+      '(or leave it blank) and re-run.',
+  );
+}
+
+export interface HealthFailure {
+  readonly code: string;
+  readonly cls: FailureClass;
+  /** The HTTP status behind the failure, when the platform actually answered. */
+  readonly status: number | null;
+}
+
+/**
+ * The ONE place a failed `HealthReport` becomes a spike code+class. api-smoke used to
+ * carry its own copy of this mapping and drifted from it, so both callers share this now.
+ *
+ * HealthClass has no code for "the API answered, with an error status": the transport
+ * folds 429/500/503 into UNREACHABLE, which reads as "no HTTP response at all" (DNS, TLS,
+ * connection refused) and points the operator at the network. A rate-limited or
+ * briefly-500ing platform is NOT unreachable, and calling it so on day 1 argues for a
+ * transport NO-GO when the right move is to back off and re-run. Recover the status and
+ * re-derive the code from it, so these spikes agree with api-smoke's raw probe — which
+ * does report RATE_LIMITED. Falls back to the flattened class when no status is present.
+ */
+export function classifyHealthFailure(health: {
+  class: string;
+  detail: string;
+  status?: number;
+}): HealthFailure {
   const map: Record<string, { code: string; cls: FailureClass }> = {
     AUTH: { code: 'AUTH_REJECTED', cls: 'INFRA' },
     NOT_FOUND: { code: 'ENDPOINT_NOT_FOUND', cls: 'INFRA' },
@@ -258,23 +312,10 @@ export async function healthGate(r: SpikeReporter, transport: MindTransport): Pr
     SHAPE: { code: 'SHAPE_DRIFT', cls: 'INFRA' },
   };
   const mapped = map[health.class] ?? { code: 'HTTP_ERROR', cls: 'INFRA' as FailureClass };
-  // HealthClass has no code for "the API answered, with an error status": the transport
-  // folds 429/500/503 into UNREACHABLE, which reads as "no HTTP response at all" (DNS,
-  // TLS, connection refused) and points the operator at the network. A rate-limited or
-  // briefly-500ing platform is NOT unreachable, and calling it so on day 1 argues for a
-  // transport NO-GO when the right move is to back off and re-run. Recover the status
-  // from the detail so these spikes agree with api-smoke's raw probe, which does report
-  // RATE_LIMITED. Falls back to the flattened class when no status is present.
   const status = health.status ?? httpStatusFrom(health.detail);
-  const refined = mapped.code === 'ENDPOINT_UNREACHABLE' && status !== null
-    ? refineHttpStatus(status)
-    : mapped;
-  failSpike(
-    refined.code,
-    refined.cls,
-    `health check failed (${health.class}${status === null ? '' : `, HTTP ${status}`}) — ` +
-      `${health.detail}. Nothing downstream of this can be trusted; fix the transport first.`,
-  );
+  const refined =
+    mapped.code === 'ENDPOINT_UNREACHABLE' && status !== null ? refineHttpStatus(status) : mapped;
+  return { code: refined.code, cls: refined.cls, status };
 }
 
 /**
@@ -331,6 +372,13 @@ export async function exchange(
   try {
     const reply = await transport.awaitReply(alias, {
       cursor: sent.cursor,
+      // The cursor alone is NOT enough. `send()` derives it from a single page of history
+      // whose paging order is unverified (see minds-client transports/messaging-api.ts),
+      // so on a newest-first or `after`-ignoring server it can point past a message the
+      // Mind sent days ago — which awaitReply would then hand back as "the reply", in
+      // milliseconds. `notBefore` is the server-clock floor that makes that impossible,
+      // and dropping it is how a silent Mind gets recorded as a PASS.
+      notBefore: sent.notBefore,
       timeoutMs: options.timeoutMs ?? 120_000,
       pollIntervalMs: options.pollIntervalMs ?? 3_000,
       skipEchoOfText: text,

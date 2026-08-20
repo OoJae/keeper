@@ -9,7 +9,7 @@
  * The last line printed is always machine-parseable:
  *   SPIKE RESULT: PASS|FAIL <name> code=<CODE> class=<INFRA|MIND|PRECONDITION|NONE> steps=n/m
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { redact, VAR_DIR } from './env.js';
@@ -204,7 +204,7 @@ export function reporter(name: string): SpikeReporter {
       }
       line(`elapsed ${(elapsedMs() / 1000).toFixed(1)}s`);
       // Never colorize this line: it is parsed by humans in a hurry and by scripts.
-      process.stdout.write(
+      writeResultLine(
         `\nSPIKE RESULT: ${self.verdict()} ${name} code=${self.code()} class=${self.classOf()} steps=${stepsPassed}/${total}\n`,
       );
       return exitCodeFor(failure);
@@ -216,16 +216,34 @@ export function reporter(name: string): SpikeReporter {
 
     crash(error: unknown): never {
       const err = error as Error;
+      // A verdict already recorded by a step OUTRANKS a later harness crash. The crash is
+      // usually in the tail (epilogue, buildNotes, appendToApiNotes) and reporting
+      // HARNESS_ERROR/PRECONDITION there would overwrite, say, ENDPOINT_NOT_FOUND/INFRA —
+      // downgrading a transport NO-GO to "our own setup, says nothing about the platform"
+      // and flipping the exit code from 1 to 2. Keep the platform verdict; report the
+      // crash as the secondary fact it is.
+      const prior = failure;
       process.stdout.write('\n');
       line(red('HARNESS BUG — the spike itself threw an unexpected error.'));
       line('This is NOT a platform verdict. Fix the harness and re-run.');
+      if (prior !== null) {
+        line(
+          `A verdict was ALREADY recorded before this crash and stands: ` +
+            `[${prior.cls} / ${prior.code}] ${prior.message}`,
+        );
+        line('The crash below happened afterwards (most likely while writing evidence).');
+      }
       process.stdout.write(`${indent(redact(err?.stack ?? String(error)))}\n`);
-      if (failure === null) failure = { code: 'HARNESS_ERROR', cls: 'PRECONDITION', message: String(err?.message ?? error) };
+      if (failure === null) {
+        failure = { code: 'HARNESS_ERROR', cls: 'PRECONDITION', message: String(err?.message ?? error) };
+      }
       const total = plannedSteps > 0 ? plannedSteps : stepsStarted;
-      process.stdout.write(
-        `\nSPIKE RESULT: FAIL ${name} code=HARNESS_ERROR class=PRECONDITION steps=${stepsPassed}/${total}\n`,
+      const code = prior === null ? 'HARNESS_ERROR' : prior.code;
+      const cls = prior === null ? 'PRECONDITION' : prior.cls;
+      writeResultLine(
+        `\nSPIKE RESULT: FAIL ${name} code=${code} class=${cls} steps=${stepsPassed}/${total}\n`,
       );
-      process.exit(2);
+      process.exit(prior === null ? 2 : exitCodeFor(prior));
     },
   };
 
@@ -235,6 +253,38 @@ export function reporter(name: string): SpikeReporter {
 function exitCodeFor(failure: SpikeFailureInfo | null): number {
   if (failure === null) return 0;
   return failure.cls === 'PRECONDITION' ? 2 : 1;
+}
+
+/**
+ * The result line is the one piece of output that must survive, and it is the LAST thing
+ * written before `finishAndExit()` calls process.exit(). When stdout is a pipe
+ * (`pnpm spike:api-smoke | tee run.log`) writes are asynchronous, and process.exit()
+ * DISCARDS whatever is still queued — measured: 350KB of output through a slow reader
+ * stopped dead at the 64KB pipe buffer with no SPIKE RESULT line at all.
+ *
+ * So: when nothing is queued (a TTY, a file redirect, a reader keeping up) write normally
+ * and keep perfect ordering. When the stream IS backed up — the only case where output is
+ * about to be lost anyway — put this line straight onto fd 1, ahead of the doomed queue.
+ * A verdict slightly out of order beats no verdict.
+ */
+function writeResultLine(text: string): void {
+  if (process.stdout.writableLength === 0) {
+    process.stdout.write(text);
+    return;
+  }
+  const buffer = Buffer.from(text, 'utf8');
+  let offset = 0;
+  // EAGAIN just means the pipe is momentarily full; anything else, fall back to the stream.
+  for (let attempts = 0; offset < buffer.length && attempts < 10_000; attempts += 1) {
+    try {
+      offset += writeSync(1, buffer, offset, buffer.length - offset);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EAGAIN') continue;
+      if ((error as NodeJS.ErrnoException).code === 'EPIPE') return;
+      break;
+    }
+  }
+  if (offset < buffer.length) process.stdout.write(buffer.subarray(offset).toString('utf8'));
 }
 
 export function safeStringify(value: unknown, space = 2): string {

@@ -21,8 +21,10 @@ import { z } from 'zod';
 
 import { loadSpikeEnv } from './_shared/env.js';
 import {
+  apiErrorMessage,
   authHeaderOrder,
   describe,
+  isAuthRejection,
   rawRequest,
   summarizeResponse,
   truncate,
@@ -32,7 +34,9 @@ import { appendToApiNotes } from './_shared/notes.js';
 import { fenced, reporter, shortId, type SpikeReporter } from './_shared/report.js';
 import {
   classifyError,
+  classifyHealthFailure,
   failSpike,
+  requireMessagingApiTransport,
   runSteps,
   type MindReply,
   type MindTransport,
@@ -55,6 +59,8 @@ interface Ctx {
   sendOk: boolean;
   sendRawKeys: string[];
   cursor: string | null;
+  /** Server-clock floor from the send receipt; without it an old message reads as a reply. */
+  notBefore: Date | null;
   reply: MindReply | null;
   replyLatencyMs: number;
   pongMatched: boolean;
@@ -71,6 +77,7 @@ const ctx: Ctx = {
   sendOk: false,
   sendRawKeys: [],
   cursor: null,
+  notBefore: null,
   reply: null,
   replyLatencyMs: 0,
   pongMatched: false,
@@ -122,8 +129,17 @@ async function main(): Promise<void> {
               `rate limited on the very first call — ${describe(response)}`,
             );
           }
-          if (response.status === 401 || response.status === 403) {
-            r.warn(`${header} rejected with ${String(response.status)} — trying the next header`);
+          // isAuthRejection, not a bare 401/403 check: the platform answers 400 with
+          // "Authentication required …" for a request it considers unauthenticated
+          // (LIVE-VERIFIED, see _shared/http.ts). Treating that as a plain HTTP_ERROR
+          // prints "NO-GO on MessagingApiTransport" for what is really a key/header
+          // problem — the one INFRA code the DECISION RULE below says is NOT yet a NO-GO.
+          if (isAuthRejection(response)) {
+            r.warn(
+              `${header} rejected with ${String(response.status)}` +
+                `${apiErrorMessage(response) === null ? '' : ` ("${apiErrorMessage(response) ?? ''}")`}` +
+                ' — trying the next header',
+            );
             continue;
           }
           if (!response.ok) failSpike('HTTP_ERROR', 'INFRA', describe(response));
@@ -147,7 +163,7 @@ async function main(): Promise<void> {
         failSpike(
           'AUTH_REJECTED',
           'INFRA',
-          `every auth header was rejected with 401/403. Tried, in order: ${ctx.headersTried.join(', ')}. ` +
+          `every auth header was refused as unauthenticated. Tried, in order: ${ctx.headersTried.join(', ')}. ` +
             'Either the key is wrong/expired, or this deployment wants a header we have not tried. ' +
             'Mint a fresh key at https://build.hellominds.ai/console and re-run.',
         );
@@ -159,6 +175,10 @@ async function main(): Promise<void> {
       run: async () => {
         const transport = createMindClient().transport;
         ctx.transport = transport;
+        // Before any health verdict: a spike pointed at the telegram-relay STUB would
+        // otherwise translate our own MINDS_TRANSPORT line into a platform NO-GO — and
+        // step 1 has just proved this platform answers.
+        requireMessagingApiTransport(transport);
         const health = await transport.healthCheck();
         r.raw('health-check', health);
         if (health.ok) {
@@ -183,19 +203,22 @@ async function main(): Promise<void> {
               `Adapter detail: ${health.detail}`,
           );
         }
-        const code =
-          health.class === 'NOT_FOUND'
-            ? 'ENDPOINT_NOT_FOUND'
-            : health.class === 'UNREACHABLE'
-              ? 'ENDPOINT_UNREACHABLE'
-              : 'SHAPE_DRIFT';
+        // Shared with healthGate() so the two paths cannot drift: HealthClass flattens
+        // 429/500/503 into UNREACHABLE, and "unreachable" is the wrong day-1 word for a
+        // platform that answered — with a status — and merely wants us to back off.
+        const failure = classifyHealthFailure(health);
+        const answered = failure.status !== null;
         failSpike(
-          code,
-          'INFRA',
+          failure.code,
+          failure.cls,
           `raw fetch succeeded with ${String(ctx.workingHeader)} but the adapter's health check ` +
-            `failed (${health.class}: ${health.detail}). Step 1 already proved the platform is ` +
-            'reachable and our key is good, so suspect @keeper/minds-client (base url, header ' +
-            'choice, or schema) BEFORE concluding anything about the platform.',
+            `failed (${health.class}${answered ? `, HTTP ${String(failure.status)}` : ''}: ${health.detail}). ` +
+            (answered
+              ? 'The platform ANSWERED, so this is its status, not our adapter and not the ' +
+                'network — back off and re-run before reading anything into it.'
+              : 'Step 1 already proved the platform is reachable and our key is good, so suspect ' +
+                '@keeper/minds-client (base url, header choice, or schema) BEFORE concluding ' +
+                'anything about the platform.'),
         );
       },
     },
@@ -243,6 +266,7 @@ async function main(): Promise<void> {
         r.info(`-> ${prompt}`);
         const sent = await transportOrThrow().send(alias, prompt);
         ctx.cursor = sent.cursor;
+        ctx.notBefore = sent.notBefore;
         ctx.sendOk = true;
         r.raw('send-response', sent.raw);
         ctx.sendRawKeys =
@@ -259,7 +283,10 @@ async function main(): Promise<void> {
               'Record this: it shapes the connector poll loop.',
           );
         }
-        r.pass(`message accepted at ${sent.sentAt.toISOString()} · cursor=${sent.cursor ?? 'null'}`);
+        r.pass(
+          `message accepted at ${sent.sentAt.toISOString()} · cursor=${sent.cursor ?? 'null'} · ` +
+            `reply floor (server clock)=${sent.notBefore?.toISOString() ?? 'none'}`,
+        );
       },
     },
 
@@ -271,6 +298,12 @@ async function main(): Promise<void> {
         try {
           reply = await transportOrThrow().awaitReply(alias, {
             cursor: ctx.cursor,
+            // Without this floor a Mind that says NOTHING can still make this step pass:
+            // the cursor comes from one page of history whose ordering is unverified, so
+            // on a newest-first (or `after`-ignoring) server awaitReply happily returns a
+            // reply the Mind sent days ago — and this spike would print "Mind replied in
+            // 0.0s" and record GO on the transport. notBefore is the server-clock guard.
+            notBefore: ctx.notBefore,
             timeoutMs: 120_000,
             pollIntervalMs: 3_000,
             skipEchoOfText: prompt,

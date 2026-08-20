@@ -13,10 +13,15 @@
  * Add --fresh-conversation to the ask phase to test recall ACROSS conversations, which
  * decides whether Keeper must pin one long-lived conversation per community.
  *
+ * The gap is ENFORCED, not merely suggested: asking in the same conversation minutes after
+ * teaching cannot separate long-term memory from the context window, so that combination
+ * refuses to produce a verdict at all (--allow-short-gap runs it as a plumbing check, and
+ * says so in docs/API-NOTES.md).
+ *
  * Grading is case-insensitive substring matching. No LLM judge: a memory verdict has to
  * be reproducible by a human reading the transcript.
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { createMindClient } from '@keeper/minds-client';
 import { z } from 'zod';
@@ -64,6 +69,22 @@ const TeachStateSchema = z.object({
   runId: z.string().min(1),
   alias: z.string().min(1),
   taughtAt: z.string().min(1),
+  /**
+   * Which Mind, on which deployment, was actually taught. Stored as a HASH, not the id:
+   * _shared/state.ts redacts identifiers on the way to disk, so a stored raw id would
+   * come back masked and never compare equal to the live one. Optional so state written
+   * before this field existed still loads; when present the ask phase refuses to grade
+   * a different Mind's memory against facts it was never told.
+   */
+  mindFingerprint: z.string().optional(),
+  baseUrl: z.string().optional(),
+  /**
+   * The Mind's acknowledgements of the taught facts. They quote the facts back, so a
+   * history read that re-serves one of them would satisfy the ask-phase grading without
+   * the Mind recalling anything. Kept so the ask phase can refuse to grade them.
+   * Optional: state files written before this field existed must still load.
+   */
+  acks: z.array(z.string()).default([]),
   facts: z
     .array(
       z.object({
@@ -81,7 +102,8 @@ interface FactResult {
   question: string;
   expected: string[];
   reply: string | null;
-  match: 'strict' | 'loose' | 'miss' | 'silent';
+  /** `stale` = history handed back a message that already existed before we asked. */
+  match: 'strict' | 'loose' | 'miss' | 'silent' | 'stale';
   latencyMs: number;
 }
 
@@ -103,13 +125,24 @@ async function main(): Promise<void> {
   r.info(`base url: ${env.baseUrl} · mind ${shortId(env.get('MINDS_MIND_ID'))}`);
   const transport = createMindClient().transport;
 
-  if (phase === 'teach') await teachPhase(transport);
-  else await askPhase(transport);
+  const identity = { mindId: env.get('MINDS_MIND_ID'), baseUrl: env.baseUrl };
+  if (phase === 'teach') await teachPhase(transport, identity);
+  else await askPhase(transport, identity);
 }
 
 // --- teach ------------------------------------------------------------------
 
-async function teachPhase(transport: MindTransport): Promise<void> {
+interface MindIdentity {
+  readonly mindId: string;
+  readonly baseUrl: string;
+}
+
+/** Survives the identifier redaction that _shared/state.ts applies on write. */
+function fingerprintOf(mindId: string): string {
+  return createHash('sha256').update(mindId).digest('hex').slice(0, 16);
+}
+
+async function teachPhase(transport: MindTransport, identity: MindIdentity): Promise<void> {
   const runId = `${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomBytes(2).toString('hex')}`;
   const alias = `keeper-memory-${runId}`;
   const acks: Array<string | null> = [];
@@ -145,6 +178,9 @@ async function teachPhase(transport: MindTransport): Promise<void> {
           runId,
           alias,
           taughtAt: new Date().toISOString(),
+          mindFingerprint: fingerprintOf(identity.mindId),
+          baseUrl: identity.baseUrl,
+          acks: acks.filter((a): a is string => typeof a === 'string' && a.trim() !== ''),
           facts: TAUGHT_FACTS.map((f) => ({
             fact: f.fact,
             question: f.question,
@@ -194,7 +230,7 @@ async function teachPhase(transport: MindTransport): Promise<void> {
 
 // --- ask --------------------------------------------------------------------
 
-async function askPhase(transport: MindTransport): Promise<void> {
+async function askPhase(transport: MindTransport, identity: MindIdentity): Promise<void> {
   const rawState = readSpikeState<unknown>(STATE_KEY);
   if (rawState === null) {
     r.fail(
@@ -219,13 +255,39 @@ async function askPhase(transport: MindTransport): Promise<void> {
   }
 
   const state = parsed.data;
+  // Grading Mind B's answers against facts taught to Mind A reads as "memory is broken"
+  // when nothing is broken — and this repo's own API-NOTES already mixes runs against
+  // localhost fakes with runs against the real deployment.
+  const taughtElsewhere =
+    (state.mindFingerprint !== undefined && state.mindFingerprint !== fingerprintOf(identity.mindId)) ||
+    (state.baseUrl !== undefined && state.baseUrl !== identity.baseUrl);
+  if (taughtElsewhere) {
+    r.fail(
+      'STATE_MISMATCH',
+      'PRECONDITION',
+      `the stored teach state was taught to a DIFFERENT Mind or deployment ` +
+        `(taught on ${state.baseUrl ?? '?'}; this run is mind ${shortId(identity.mindId)} on ${identity.baseUrl}). ` +
+        'A Mind that was never told the facts cannot recall them; grading it would look like a ' +
+        'memory failure. Point MINDS_MIND_ID / MINDS_API_BASE_URL back at the taught Mind, or ' +
+        're-run `pnpm spike:memory -- --phase=teach` against this one.',
+    );
+    r.finishAndExit();
+  }
   const fresh = argFlag('fresh-conversation');
+  // A per-run nonce, not just HH:MM: two `--fresh-conversation` runs inside the same
+  // clock minute used to share an alias, so the second one asked its questions in a
+  // conversation the first had already used while still reporting it as "a conversation
+  // the facts were never told to". (Two such entries are already in docs/API-NOTES.md.)
   const askAlias = fresh
-    ? `${state.alias}-fresh-${new Date().toISOString().slice(11, 16).replace(':', '')}`
+    ? `${state.alias}-fresh-${new Date().toISOString().slice(11, 16).replace(':', '')}-${randomBytes(2).toString('hex')}`
     : state.alias;
   const elapsedMs = Date.now() - new Date(state.taughtAt).getTime();
   const elapsedMin = Math.round(elapsedMs / 60_000);
+  const shortGap = elapsedMs < MIN_GAP_MS;
   const results: FactResult[] = [];
+  /** Ids of messages that existed BEFORE we asked. None of them can be an answer. */
+  const priorIds = new Set<string>();
+  const teachAcks = new Set(state.acks.map((a) => a.trim()));
 
   r.info(`taught at ${state.taughtAt} (${elapsedMin} min ago)`);
   r.info(
@@ -234,10 +296,37 @@ async function askPhase(transport: MindTransport): Promise<void> {
           'This tests memory ACROSS conversations.'
       : `asking in the SAME alias "${askAlias}" as the teach phase.`,
   );
-  if (elapsedMs < MIN_GAP_MS) {
+  if (shortGap && !fresh && !argFlag('allow-short-gap')) {
+    // Same conversation + no elapsed time = nothing was crossed. Every chat model answers
+    // from the conversation it is already in; grading that would mint a LIVE-VERIFIED
+    // "cross-session recall" entry in the day-1 decision document for a Mind with no
+    // long-term memory at all. Refuse to produce a verdict instead.
+    r.plain('');
+    r.plain(`  Only ${elapsedMin} min have passed since the teach phase, and you are asking in the`);
+    r.plain('  SAME conversation. That combination proves nothing: the facts are still in the');
+    r.plain('  conversation itself, so an ordinary context window answers them without any');
+    r.plain('  long-term memory. Do one of these instead:');
+    r.plain('');
+    r.plain(`      wait until ${new Date(new Date(state.taughtAt).getTime() + MIN_GAP_MS).toISOString()}, then:  pnpm spike:memory -- --phase=ask`);
+    r.plain('      or test the other axis now:  pnpm spike:memory -- --phase=ask --fresh-conversation');
+    r.plain('      or, to see the plumbing only (NO memory verdict is recorded):');
+    r.plain('          pnpm spike:memory -- --phase=ask --allow-short-gap');
+    r.plain('');
+    r.fail(
+      'GAP_TOO_SHORT',
+      'PRECONDITION',
+      `only ${elapsedMin} min since the teach phase (need >= ${MIN_GAP_MS / 60_000}) and the same ` +
+        'conversation — this run cannot distinguish long-term memory from the context window. ' +
+        'No memory verdict was produced and nothing was written to docs/API-NOTES.md.',
+    );
+    r.finishAndExit();
+  }
+  if (shortGap) {
     r.warn(
-      `only ${elapsedMin} min since the teach phase (wanted >= 10). A short gap can be served ` +
-        'from immediate context rather than long-term memory — a PASS here is weaker evidence.',
+      `only ${elapsedMin} min since the teach phase (wanted >= ${MIN_GAP_MS / 60_000}). ` +
+        (fresh
+          ? 'A new conversation still tests conversation-independence, but NOT durability over time.'
+          : 'Running with --allow-short-gap: a PASS here is about plumbing, not about memory.'),
     );
   }
 
@@ -255,6 +344,22 @@ async function askPhase(transport: MindTransport): Promise<void> {
           },
         ]
       : []),
+    {
+      name: 'snapshot what is ALREADY in the conversation (nothing here may count as an answer)',
+      run: async () => {
+        // Idempotent, and it stops a missing conversation from surfacing as a bare 404 on
+        // the history endpoint. The fresh path already ensured; this covers the other one.
+        await transport.ensureConversation(askAlias);
+        const before = await transport.getHistory(askAlias, { limit: 200 });
+        for (const message of before) {
+          if (typeof message.id === 'string') priorIds.add(message.id);
+        }
+        r.pass(
+          `${before.length} message(s) already in "${askAlias}"; ${priorIds.size} fingerprint(s) ` +
+            `and ${teachAcks.size} teach acknowledgement(s) are now disqualified as answers.`,
+        );
+      },
+    },
     ...state.facts.map((fact, index) => ({
       name: `ask fact ${index + 1}/${state.facts.length}: ${fact.question}`,
       run: async () => {
@@ -264,7 +369,14 @@ async function askPhase(transport: MindTransport): Promise<void> {
           tolerateSilence: true,
         });
         const text = result.reply?.text ?? null;
-        const match = grade(text, fact.expectedSubstrings, fact.looseSubstrings);
+        // A "reply" that already existed before the question, or that is verbatim the
+        // acknowledgement the Mind gave when it was TAUGHT the fact, is history being
+        // re-served — it quotes the fact, so substring grading would score it as recall.
+        const staleId = result.reply !== null && priorIds.has(result.reply.id);
+        const staleAck = text !== null && teachAcks.has(text.trim());
+        const match: FactResult['match'] =
+          staleId || staleAck ? 'stale' : grade(text, fact.expectedSubstrings, fact.looseSubstrings);
+        if (result.reply !== null) priorIds.add(result.reply.id);
         results.push({
           question: fact.question,
           expected: [...fact.expectedSubstrings],
@@ -275,7 +387,13 @@ async function askPhase(transport: MindTransport): Promise<void> {
         if (match === 'strict') r.pass(`recalled — matched "${fact.expectedSubstrings.join('" / "')}"`);
         else if (match === 'loose') r.pass(`recalled, non-canonical wording — matched a loose variant`);
         else if (match === 'silent') r.warn('no reply at all to this question');
-        else r.warn(`no expected substring in the reply (wanted "${fact.expectedSubstrings.join('" / "')}")`);
+        else if (match === 'stale') {
+          r.warn(
+            `NOT GRADED: this "reply" ${staleAck ? 'is verbatim the teach-phase acknowledgement' : 'already existed in history before we asked'}. ` +
+              'The forward-only `after` cursor handed us an OLD message. Whatever it contains is ' +
+              'our own taught text coming back, not recall.',
+          );
+        } else r.warn(`no expected substring in the reply (wanted "${fact.expectedSubstrings.join('" / "')}")`);
       },
     })),
     {
@@ -284,6 +402,21 @@ async function askPhase(transport: MindTransport): Promise<void> {
         printTable(results, elapsedMin);
         const recalled = results.filter((x) => x.match === 'strict' || x.match === 'loose').length;
         const silent = results.filter((x) => x.match === 'silent').length;
+        const stale = results.filter((x) => x.match === 'stale').length;
+        if (stale > 0) {
+          // Not a memory verdict at all: the history endpoint violated its own forward-only
+          // contract (docs/API-NOTES.md). Every awaitReply in the product would be exposed to
+          // the same thing, so this belongs in the transport decision, not the Mind's column.
+          failSpike(
+            'HISTORY_CURSOR_BROKEN',
+            'INFRA',
+            `${stale}/${results.length} "replies" were messages that already existed before the ` +
+              'question was asked. `GET /v1/messaging/histories/{alias}?after=` is documented as a ' +
+              'forward-only cursor; it is re-serving old records. Nothing about the Mind\'s memory ' +
+              'can be concluded from this run — a Mind that said nothing at all would score the same. ' +
+              'Fix or work around the cursor first, then re-run.',
+          );
+        }
         if (silent === results.length) {
           failSpike(
             'MIND_SILENT',
@@ -362,9 +495,24 @@ function printTable(results: FactResult[], elapsedMin: number): void {
 
 function epilogue(fresh: boolean, results: FactResult[], elapsedMin: number): void {
   const recalled = results.filter((x) => x.match === 'strict' || x.match === 'loose').length;
+  const stale = results.filter((x) => x.match === 'stale').length;
   r.plain('');
   r.plain('────────────────── WHAT THIS MEANS FOR THE ARCHITECTURE ──────────────────');
   r.plain('');
+  if (stale > 0) {
+    r.plain(`  ${stale}/${results.length} "answers" were messages that already existed before the`);
+    r.plain('  question. This is a HISTORY CURSOR bug on the platform, not a memory result:');
+    r.plain('  a Mind that stayed completely silent would have scored exactly the same.');
+    r.plain('  Nothing about memory is known from this run. Fix the cursor and re-run.');
+    r.plain('');
+    r.plain('──────────────────────────────────────────────────────────────────────────');
+    return;
+  }
+  if (elapsedMin < MIN_GAP_MS / 60_000 && results.length > 0) {
+    r.plain(`  NOTE: only ${elapsedMin} min elapsed since the teach phase — under the ${MIN_GAP_MS / 60_000}-minute`);
+    r.plain('  floor. Whatever follows is about plumbing and conversation scope, not durability.');
+    r.plain('');
+  }
   if (results.length === 0) {
     r.plain('  No answers were collected — nothing can be concluded about memory.');
   } else if (recalled === results.length && fresh) {
@@ -397,6 +545,8 @@ function buildAskNotes(
   results: FactResult[],
 ): string {
   const recalled = results.filter((x) => x.match === 'strict' || x.match === 'loose').length;
+  const stale = results.filter((x) => x.match === 'stale').length;
+  const shortGap = elapsedMin < MIN_GAP_MS / 60_000;
   const rows = results
     .map(
       (result, index) =>
@@ -404,12 +554,34 @@ function buildAskNotes(
         `${(result.latencyMs / 1000).toFixed(1)}s | ${short(result.reply)} |`,
     )
     .join('\n');
+  const warnings = r.warnings();
   return [
-    `**Cross-session recall: ${recalled}/${results.length} after ${elapsedMin} minutes` +
-      `${fresh ? ', asked in a NEW conversation' : ', asked in the same conversation'}.**`,
+    // "Cross-session" is only claimed when a session boundary was actually crossed.
+    `**${fresh && !shortGap ? 'Cross-session recall' : 'Recall'}: ${recalled}/${results.length} after ` +
+      `${elapsedMin} minutes${fresh ? ', asked in a NEW conversation' : ', asked in the same conversation'}.**`,
     `Teach alias \`${state.alias}\` (taught ${state.taughtAt}) · ask alias \`${askAlias}\`. ` +
       'Grading is case-insensitive substring matching, no LLM judge.',
     ['| # | expected | match | latency | reply |', '|---|---|---|---|---|', rows].join('\n'),
+    ...(shortGap
+      ? [
+          `**Weak evidence — the gap was ${elapsedMin} min, under the ${MIN_GAP_MS / 60_000}-minute floor.** ` +
+            (fresh
+              ? 'A new conversation still tests conversation-independence, but this run says nothing ' +
+                'about durability over time. Re-run the ask phase after a long gap (overnight is best).'
+              : 'Asked in the same conversation after almost no time, so an ordinary context window ' +
+                'answers these without any long-term memory. Do NOT cite this as evidence of memory.'),
+        ]
+      : []),
+    ...(stale > 0
+      ? [
+          `**${stale}/${results.length} answers were disqualified as stale** — history returned ` +
+            'messages that already existed before the question. See the INFRA failure above: the ' +
+            '`after` cursor is not forward-only on this deployment.',
+        ]
+      : []),
+    ...(warnings.length > 0
+      ? [['**Warnings**', ...warnings.map((w) => `- ${w}`)].join('\n')]
+      : []),
     fresh
       ? recalled === results.length
         ? '**Architecture consequence:** memory is NOT conversation-scoped — Keeper may open ' +
@@ -437,6 +609,7 @@ function usage(phase: string): void {
   r.plain('      … wait at least 10 minutes …');
   r.plain('      pnpm spike:memory -- --phase=ask       # asks them back, grades by substring');
   r.plain('      pnpm spike:memory -- --phase=ask --fresh-conversation   # across conversations');
+  r.plain('      pnpm spike:memory -- --phase=ask --allow-short-gap      # plumbing only, no verdict');
   r.plain('');
   r.plain('  (If argument forwarding through pnpm eats the flag, use the env fallback:');
   r.plain('      SPIKE_PHASE=ask pnpm spike:memory');
