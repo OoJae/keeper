@@ -258,12 +258,44 @@ export async function healthGate(r: SpikeReporter, transport: MindTransport): Pr
     SHAPE: { code: 'SHAPE_DRIFT', cls: 'INFRA' },
   };
   const mapped = map[health.class] ?? { code: 'HTTP_ERROR', cls: 'INFRA' as FailureClass };
+  // HealthClass has no code for "the API answered, with an error status": the transport
+  // folds 429/500/503 into UNREACHABLE, which reads as "no HTTP response at all" (DNS,
+  // TLS, connection refused) and points the operator at the network. A rate-limited or
+  // briefly-500ing platform is NOT unreachable, and calling it so on day 1 argues for a
+  // transport NO-GO when the right move is to back off and re-run. Recover the status
+  // from the detail so these spikes agree with api-smoke's raw probe, which does report
+  // RATE_LIMITED. Falls back to the flattened class when no status is present.
+  const status = health.status ?? httpStatusFrom(health.detail);
+  const refined = mapped.code === 'ENDPOINT_UNREACHABLE' && status !== null
+    ? refineHttpStatus(status)
+    : mapped;
   failSpike(
-    mapped.code,
-    mapped.cls,
-    `health check failed (${health.class}) — ${health.detail}. ` +
-      'Nothing downstream of this can be trusted; fix the transport first.',
+    refined.code,
+    refined.cls,
+    `health check failed (${health.class}${status === null ? '' : `, HTTP ${status}`}) — ` +
+      `${health.detail}. Nothing downstream of this can be trusted; fix the transport first.`,
   );
+}
+
+/**
+ * Fallback for a transport that does not report `HealthReport.status`. Digs the status out
+ * of MindsHttpError's message, whose first clause is always `Minds API <status> on <METHOD>
+ * <url>`. MindsUnreachableError says "Minds API unreachable after …", which has no digits
+ * there and so cannot false-match.
+ */
+function httpStatusFrom(detail: string): number | null {
+  const match = /Minds API (\d{3}) on /.exec(detail);
+  if (match?.[1] === undefined) return null;
+  const status = Number(match[1]);
+  return Number.isFinite(status) ? status : null;
+}
+
+/** Same status -> code mapping classifyError uses, so both paths agree. */
+function refineHttpStatus(status: number): { code: string; cls: FailureClass } {
+  if (status === 404) return { code: 'ENDPOINT_NOT_FOUND', cls: 'INFRA' };
+  if (status === 401 || status === 403) return { code: 'AUTH_REJECTED', cls: 'INFRA' };
+  if (status === 429) return { code: 'RATE_LIMITED', cls: 'INFRA' };
+  return { code: 'HTTP_ERROR', cls: 'INFRA' };
 }
 
 export interface ExchangeOptions {

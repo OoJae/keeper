@@ -82,6 +82,14 @@ export interface HealthReport {
   readonly ok: boolean;
   readonly class: HealthClass;
   readonly detail: string;
+  /**
+   * The HTTP status, when the platform actually answered. `class` alone cannot carry this:
+   * it folds 429/500/503 into UNREACHABLE, which reads as "no HTTP response at all" and
+   * points the operator at their network. A rate-limited or briefly-500ing platform is not
+   * unreachable, and on day 1 that difference decides a transport NO-GO. Absent when no
+   * response was received (DNS, TLS, connection refused) or the transport cannot report it.
+   */
+  readonly status?: number;
 }
 
 export interface HistoryOpts {

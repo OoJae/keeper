@@ -330,12 +330,13 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
             ok: false,
             class: 'AUTH',
             detail: `${e.status} — check MINDS_BUILDER_API_KEY and MINDS_AUTH_HEADER (${e.message})`,
+            status: e.status,
           };
         }
         if (e.isNotFound) {
-          return { ok: false, class: 'NOT_FOUND', detail: e.message };
+          return { ok: false, class: 'NOT_FOUND', detail: e.message, status: e.status };
         }
-        return { ok: false, class: 'UNREACHABLE', detail: e.message };
+        return { ok: false, class: 'UNREACHABLE', detail: e.message, status: e.status };
       }
       if (e instanceof MindsUnreachableError) {
         return { ok: false, class: 'UNREACHABLE', detail: e.message };
