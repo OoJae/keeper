@@ -109,3 +109,30 @@ for manual poking if you install it outside the repo.
 ## Live spike results
 
 <!-- Spike scripts append below this line. Do not edit their entries by hand. -->
+
+
+## api-smoke — 2026-08-20T19:03:14.221Z — FAIL ENDPOINT_UNREACHABLE
+
+**Result:** `FAIL` · code `ENDPOINT_UNREACHABLE` · class `INFRA` · ran 0.1s · **LIVE-VERIFIED** (produced by `pnpm spike:api-smoke`).
+
+- `baseUrl`: `http://127.0.0.1:9`
+- `authHeaderHonored`: `none`
+- `authHeadersTried`: `X-Api-Key`
+- `alias`: `keeper-smoke-20260820`
+- `mindId`: `mind_fak…89`
+- `replyLatencyMs`: _(none)_
+- `cognitionBefore`: _(none)_
+- `cognitionAfter`: _(none)_
+
+**Auth header: UNRESOLVED** — no header was accepted; see the failure above.
+
+| Call | Verified |
+|---|---|
+| `GET /v1/messaging/conversations` (raw fetch, no adapter) | NO |
+| adapter `healthCheck()` | not reached |
+| `ensureConversation(alias)` | NO / not reached |
+| `POST /v1/messaging/message` | NO / not reached |
+| Mind reply within 120s | NO |
+| `GET /v1/minds/{mindId}/credits` | NO |
+
+**Transport decision:** **NO-GO** on `MessagingApiTransport` (INFRA `ENDPOINT_UNREACHABLE`) — activate the Telegram-relay plan (BUILD_PLAN §5 Phase 0 gate).

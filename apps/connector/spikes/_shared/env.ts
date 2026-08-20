@@ -1,0 +1,215 @@
+/**
+ * Spike environment loading, CLI-arg reading, and secret redaction.
+ *
+ * This module deliberately has NO runtime imports from the other _shared modules,
+ * so it can never participate in an import cycle (report/notes/state all import it).
+ */
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import dotenv from 'dotenv';
+import { z } from 'zod';
+
+import type { SpikeReporter } from './report.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** Walk up from this file until we find the workspace root marker. */
+function findRepoRoot(): string {
+  let dir = HERE;
+  for (let i = 0; i < 8; i += 1) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir;
+    const parent = resolve(dir, '..');
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // Fallback: apps/connector/spikes/_shared -> repo root is four levels up.
+  return resolve(HERE, '..', '..', '..', '..');
+}
+
+export const REPO_ROOT = findRepoRoot();
+export const ENV_PATH = join(REPO_ROOT, '.env');
+export const ENV_EXAMPLE_PATH = join(REPO_ROOT, '.env.example');
+export const VAR_DIR = join(REPO_ROOT, 'var');
+
+// --- secrets ---------------------------------------------------------------
+
+const SECRETS = new Set<string>();
+
+/** Any value registered here is scrubbed from printed output and from API-NOTES. */
+export function registerSecret(value: string | undefined | null): void {
+  if (typeof value === 'string' && value.trim().length >= 6) SECRETS.add(value.trim());
+}
+
+export function redact(text: string): string {
+  let out = text;
+  for (const secret of SECRETS) out = out.split(secret).join('***REDACTED***');
+  return out;
+}
+
+// --- CLI args --------------------------------------------------------------
+
+/**
+ * Reads `--name=value` or `--name value` from argv, falling back to the
+ * SPIKE_<NAME> env var. The env fallback exists because `pnpm spike:x -- --flag`
+ * has to survive two levels of pnpm script forwarding.
+ */
+export function argValue(name: string): string | undefined {
+  const argv = process.argv.slice(2);
+  const prefix = `--${name}=`;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === undefined) continue;
+    if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+    if (arg === `--${name}`) {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith('--')) return next;
+    }
+  }
+  const fromEnv = process.env[`SPIKE_${name.toUpperCase().replace(/-/g, '_')}`];
+  return fromEnv === undefined || fromEnv === '' ? undefined : fromEnv;
+}
+
+export function argFlag(name: string): boolean {
+  if (process.argv.slice(2).includes(`--${name}`)) return true;
+  const fromEnv = process.env[`SPIKE_${name.toUpperCase().replace(/-/g, '_')}`];
+  return fromEnv === '1' || fromEnv === 'true';
+}
+
+// --- env -------------------------------------------------------------------
+
+interface EnvGuidance {
+  readonly line: string;
+  readonly where: string;
+}
+
+const GUIDANCE: Record<string, EnvGuidance> = {
+  MINDS_BUILDER_API_KEY: {
+    line: 'MINDS_BUILDER_API_KEY=<paste the key here>',
+    where:
+      'Builder console -> https://build.hellominds.ai/console -> create an API key ' +
+      '(name + expiry). The token is shown ONCE — copy it the moment it appears.',
+  },
+  MINDS_MIND_ID: {
+    line: 'MINDS_MIND_ID=<steward mind id>',
+    where:
+      'The Minds app (https://hellominds.ai) -> open your Steward Mind -> copy its id ' +
+      '(also returned by GET /v1/humans/{humanId}/minds).',
+  },
+  MINDS_REWARDS_MIND_ID: {
+    line: 'MINDS_REWARDS_MIND_ID=<rewards mind id>',
+    where:
+      'The Minds app -> your second (Rewards) Mind -> copy its id. If you have not made ' +
+      'one yet, create it: the first 3 Minds each get free Cognition.',
+  },
+  MINDS_API_BASE_URL: {
+    line: 'MINDS_API_BASE_URL=https://api.build.hellominds.ai',
+    where: 'Optional override. Leave blank unless the platform tells you otherwise.',
+  },
+  MINDS_AUTH_HEADER: {
+    line: 'MINDS_AUTH_HEADER=x-api-key',
+    where:
+      'x-api-key (canonical) | x-access-key (deprecated) | auto (retry the legacy header ' +
+      'on 401/403). Run `pnpm spike:api-smoke` — it tells you which one the platform honors.',
+  },
+  TELEGRAM_BOT_TOKEN: {
+    line: 'TELEGRAM_BOT_TOKEN=<token from @BotFather>',
+    where: 'Telegram -> @BotFather -> /newbot (or /token for an existing bot).',
+  },
+};
+
+export interface SpikeEnv {
+  /** Throws only if called with a name that was not in `required`. */
+  get(name: string): string;
+  optional(name: string): string | undefined;
+  readonly baseUrl: string;
+  readonly authHeaderPreference: string;
+}
+
+const NON_EMPTY = z.string().trim().min(1);
+
+/**
+ * Loads .env from the repo root and validates the vars this spike needs.
+ * On failure it prints the exact fix for every missing var and exits 2.
+ */
+export function loadSpikeEnv(required: string[], r?: SpikeReporter): SpikeEnv {
+  const envFileExists = existsSync(ENV_PATH);
+  if (envFileExists) dotenv.config({ path: ENV_PATH });
+
+  const shape: Record<string, typeof NON_EMPTY> = {};
+  for (const name of required) shape[name] = NON_EMPTY;
+  const parsed = z.object(shape).safeParse(
+    Object.fromEntries(required.map((name) => [name, process.env[name]])),
+  );
+
+  if (!parsed.success) {
+    const missing = required.filter((name) => {
+      const value = process.env[name];
+      return value === undefined || value.trim() === '';
+    });
+    printEnvFailure(missing.length > 0 ? missing : required, envFileExists);
+    if (r) {
+      r.fail(
+        'MISSING_ENV',
+        'PRECONDITION',
+        `missing required environment variables: ${(missing.length > 0 ? missing : required).join(', ')}`,
+      );
+      r.finishAndExit();
+    }
+    process.exit(2);
+  }
+
+  for (const name of required) {
+    if (/KEY|TOKEN|SECRET/.test(name)) registerSecret(process.env[name]);
+  }
+  // Always scrub the builder key, even when a spike did not require it.
+  registerSecret(process.env['MINDS_BUILDER_API_KEY']);
+  registerSecret(process.env['MINDS_ACCESS_KEY']);
+
+  const values = parsed.data;
+  return {
+    get(name: string): string {
+      const value = values[name];
+      if (typeof value !== 'string') {
+        throw new Error(
+          `spike bug: env "${name}" was read but not declared in loadSpikeEnv([...]).`,
+        );
+      }
+      return value;
+    },
+    optional(name: string): string | undefined {
+      const value = process.env[name];
+      return value === undefined || value.trim() === '' ? undefined : value.trim();
+    },
+    baseUrl: (process.env['MINDS_API_BASE_URL'] ?? '').trim() || 'https://api.build.hellominds.ai',
+    authHeaderPreference: ((process.env['MINDS_AUTH_HEADER'] ?? '').trim() || 'x-api-key').toLowerCase(),
+  };
+}
+
+function printEnvFailure(missing: string[], envFileExists: boolean): void {
+  const lines: string[] = [];
+  lines.push('');
+  lines.push('PRECONDITION FAILURE — this spike cannot start: required configuration is missing.');
+  lines.push('');
+  lines.push(
+    envFileExists
+      ? `  .env found at: ${ENV_PATH}`
+      : `  .env NOT FOUND at: ${ENV_PATH}\n  Fix first:  cp ${ENV_EXAMPLE_PATH} ${ENV_PATH}`,
+  );
+  lines.push('');
+  lines.push(`Missing ${missing.length} variable${missing.length === 1 ? '' : 's'}:`);
+  missing.forEach((name, index) => {
+    const guidance = GUIDANCE[name];
+    lines.push('');
+    lines.push(`  ${index + 1}. ${name}`);
+    lines.push(`     add this line to ${ENV_PATH}:`);
+    lines.push(`         ${guidance ? guidance.line : `${name}=<value>`}`);
+    lines.push(`     where to get it: ${guidance ? guidance.where : 'see docs/BUILD_PLAN.md §5 Phase 0.'}`);
+  });
+  lines.push('');
+  lines.push('This is a PRECONDITION failure: our harness/setup, not the platform.');
+  lines.push('It says NOTHING about whether the Minds API works. Fix the above and re-run.');
+  lines.push('');
+  process.stdout.write(`${lines.join('\n')}\n`);
+}
