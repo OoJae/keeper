@@ -1,0 +1,28 @@
+{
+  "name": "keeper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:connector": "pnpm --filter @keeper/connector dev",
+    "dev:dashboard": "pnpm --filter @keeper/dashboard dev",
+    "seed:day": "pnpm --filter @keeper/seeder seed:day",
+    "demo:run": "pnpm --filter @keeper/seeder demo:run",
+    "test": "vitest run",
+    "typecheck": "tsc --build --force",
+    "spike:api-smoke": "pnpm --filter @keeper/connector spike:api-smoke",
+    "spike:memory": "pnpm --filter @keeper/connector spike:memory",
+    "spike:proactive": "pnpm --filter @keeper/connector spike:proactive",
+    "spike:circle": "pnpm --filter @keeper/connector spike:circle",
+    "spike:wallet": "pnpm --filter @keeper/connector spike:wallet"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
