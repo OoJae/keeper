@@ -1,0 +1,19 @@
+{
+  "name": "@keeper/seeder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed:day": "tsx src/seed-day.ts",
+    "demo:run": "tsx src/demo-run.ts",
+    "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@keeper/protocol": "workspace:*",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
