@@ -106,6 +106,43 @@ for manual poking if you install it outside the repo.
 
 ---
 
+## LIVE-VERIFIED corrections (2026-08-22, from the first real key)
+
+These were exercised against `https://api.build.hellominds.ai` with our own Builder key and
+**outrank the WEB-VERIFIED baseline above**.
+
+- **Auth: `X-Api-Key` accepted (200).** The deprecation note is correct; the legacy header
+  was never needed.
+- **Replies are HTML.** The Mind answers with `<p>…</p>` markup, not plain text. Two
+  consequences: a KEEPER-ACTION block can arrive entity-escaped (handled in
+  `packages/protocol` since 2026-08-22), and anything relayed to Telegram must be converted
+  — Telegram accepts only a small HTML subset and will reject or mangle the rest.
+- **`POST /v1/messaging/message` returns no `fingerprint`.** Body is
+  `{ alias, conversationId, messageId, artifactIds }`.
+- **Fingerprint format is `<16-digit seq>_<messageId>`.** Since the POST returns
+  `messageId`, `send()` locates its own message in the next history page and uses that as
+  the cursor (best-effort; `notBefore` remains the correctness guard).
+- **`senderType: 0` = the Mind.** Confirmed on a real reply; `senderId` is the mindId and
+  `senderEmail` is the Mind's own address (`<name>@hellominds.ai`) — that address is how a
+  Mind-to-Mind introduction is made, so it matters for the Circle spike.
+- **`GET /v1/minds/{mindId}/credits` does NOT return `{mindId, cognition}`.** It returns
+  `{ mindId, swarm, credits, creditsMinted, creditsStaged, num }`, with `credits: 0` and
+  `creditsStaged: 185.77` on a Mind that is demonstrably answering. **Cognition accounting
+  is therefore unresolved**: we cannot yet price an exchange, so the §7 pre-filter budget
+  stays an estimate. Ask at office hours which field is the spendable balance.
+- **Latency is 23–65 s per exchange, not seconds.** Measured: 23.0 s (one-word `PONG`
+  reply), then 44.2 s / 65.3 s / 48.0 s for conversational turns. **BUILD_PLAN Phase 1's
+  "< ~15 s end-to-end" acceptance criterion is not achievable on this platform.** This is
+  the §12 "Mind latency too high for live chat feel" risk, now measured rather than
+  predicted: pre-filter hard, frame the UX as "Keeper considers, then acts", and pre-stage
+  every demo beat.
+- **The Mind is conversational and cautious by default.** Asked to store a locker code it
+  replied with a clarifying question rather than a bare acknowledgement, and it pushed back
+  on the name "Keeper" as its own. Phase 2's charter has to establish the envelope/directive
+  contract firmly, or replies will not be machine-parseable.
+
+---
+
 ## Live spike results
 
 <!-- Spike scripts append below this line. Do not edit their entries by hand. -->

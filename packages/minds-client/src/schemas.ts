@@ -62,6 +62,12 @@ export const SendResponseSchema = z
   .object({
     fingerprint: z.string().optional(),
     conversationId: z.string().optional(),
+    /**
+     * LIVE-VERIFIED 2026-08-22: this deployment returns no `fingerprint`, but it does
+     * return `messageId`, and a history fingerprint is `<seq>_<messageId>`. That lets
+     * send() recover its own cursor instead of guessing from a pre-send snapshot.
+     */
+    messageId: z.string().optional(),
     messageText: z.string().nullish(),
   })
   .passthrough();

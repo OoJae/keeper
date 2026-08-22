@@ -194,7 +194,13 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
     // The send response shape is undocumented. If it hands us a fingerprint it is
     // strictly better than F0 (no window between the history read and the post).
     const parsed = parseOrThrow(SendResponseSchema, 'POST /v1/messaging/message', posted.body ?? {});
-    const cursor = parsed.fingerprint ?? f0;
+    // This deployment returns `messageId` instead (LIVE-VERIFIED 2026-08-22). A history
+    // fingerprint is `<seq>_<messageId>`, so our own posted message can be located in the
+    // next page and its fingerprint used as the cursor — which beats F0, because F0 leaves
+    // a window between the pre-send snapshot and the post in which another message can land.
+    const ownFingerprint =
+      parsed.fingerprint ?? (parsed.messageId === undefined ? null : await this.findFingerprintByMessageId(alias, parsed.messageId));
+    const cursor = ownFingerprint ?? f0;
 
     this.mutateState((s) => {
       const entry = s.conversations[alias];
@@ -209,6 +215,25 @@ export class MessagingApiTransport implements MindTransport, CognitionSampler {
       notBefore: highWater ? recordTime(highWater) : null,
       raw: posted.body,
     };
+  }
+
+  /**
+   * Locate a just-posted message by its `messageId`. Fingerprints are `<seq>_<messageId>`
+   * (LIVE-VERIFIED 2026-08-22), so a suffix match identifies it without assuming page
+   * order. Best-effort by design: any failure returns null and the caller falls back to
+   * the pre-send snapshot, because a cursor is an optimisation and `notBefore` is the
+   * actual correctness guard.
+   */
+  private async findFingerprintByMessageId(alias: string, messageId: string): Promise<string | null> {
+    try {
+      const page = await this.fetchHistory(alias, { limit: DEFAULT_HISTORY_PAGE_SIZE });
+      const mine = page.filter((r) => r.fingerprint.endsWith(`_${messageId}`));
+      // Exactly one match is expected; anything else means the assumption does not hold
+      // here, and guessing would be worse than falling back.
+      return mine.length === 1 ? (mine[0]?.fingerprint ?? null) : null;
+    } catch {
+      return null;
+    }
   }
 
   // ------------------------------------------------------------------ awaitReply
