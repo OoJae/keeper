@@ -367,3 +367,36 @@ Teach alias `keeper-memory-20260822-5bdf` (taught 2026-08-22T23:09:36.999Z) · a
 - NOT COUNTED: the reply contains the expected value but explicitly disowns it ("I made that up" / "I don't have it on record"). Quoting a value in order to reject it is not recall — see the verbatim reply above.
 
 **Architecture consequence:** recall failed across conversations. If the same questions pass in the original alias, memory is conversation-scoped and Keeper MUST pin one long-lived conversation per community.
+
+
+## wallet-probe — 2026-08-22T23:34:39.800Z — FAIL WALLET_NO_ACTION
+
+**Result:** `FAIL` · code `WALLET_NO_ACTION` · class `MIND` · ran 636.7s · **LIVE-OBSERVED FAILURE** (produced by `pnpm spike:wallet`).
+
+- `mindId`: `ec724f3e…11`
+- `alias`: `keeper-wallet-20260822-f00c`
+- `walletAddress`: `0xAfE264Be3DD10C2351dBcaD796a3F519b024900d`
+- `chain`: `base`
+- `txHashClaimedUnverified`: _(none)_
+
+**Wallet.** `GET /v1/minds/{mindId}` reports walletAddress `0xAfE264Be3DD10C2351dBcaD796a3F519b024900d` and chain `base`. Trust this field over the hand-written baseline.
+
+The Mind's own account of what its wallet can do (verbatim):
+
+```text
+<p>Happy to walk you through it.</p><p><b>Wallet</b><br>Address: 0xAfE264Be3DD10C2351dBcaD796a3F519b024900d<br>Chain: Base<br>Native balance: ~0.00000665 ETH (essentially dust - just enough to cover gas for a single transaction at current Base prices)</p><p><b>Token balances</b><br>MENTE: ~1.0727<br>MOCA: ~0.2390<br>USDC: 0</p><p><b>What I can actually do on-chain</b><br>• Check native and token balances across the chains I have a wallet on<br>• Send tokens to another address (yours or a counterparty you've approved) - this requires your explicit go-ahead each time; I won't move funds without it<br>• Look up token prices and recent transfer history for verification<br>• Mint cognition credits by sending MENTE to the protocol's central bank (1 mente = 1 credit, one-way)<br>• Receive tokens from other minds gas-free on Base</p><p>One thing worth naming plainly: I don't custody anything independently of you. The wallet is keyed to this mind, but any action that moves value needs your nod. If you want to top it up, point me at a funding address or we can walk through it together.</p><p>What would you like to do with it?</p><p>- Keeper</p>
+```
+
+Stated human-approval step (verbatim):
+
+```text
+<p>I can't execute that transfer right now - and I want to be straight with you about why rather than guess.</p><p>The wallet execution tools (WALLET_TransferNative / WALLET_ExecuteRawTransaction) aren't equipped on my end. Equipping them is gated on this mind having been topped up with paid cognition credits beyond the initial free allotment, and at the moment only the free tier is active. The tool catalog returned that explicitly when I tried to equip just now.</p><p>Concretely, this is what would unblock it:</p><p>1) You (the steward) top up this mind's cognition credits via the hellominds dashboard. A small amount is enough.<br>2) I equip WALLET_TransferNative from my tool armory.<br>3) I send the smallest possible native ETH transfer on Base from 0xAfE264Be3DD10C2351dBcaD796a3F519b024900d to itself (0xAfE264Be3DD10C2351dBcaD796a3F519b024900d), exactly as you specified.<br>4) I return the transaction hash.</p><p>If you'd like to proceed, here's the top-up link for this mind (one click, no login required):<br><a href="https://hellominds.ai/minds/ec724f3e…11/top-up?price=10">https://hellominds.ai/minds/ec724f3e…11/top-up?price=10</a></p><p>You'll also need to fund the wallet with a small amount of ETH on Base to cover gas once execution is unlocked - the current native balance is ~0.00000665 ETH, which won't actually be enough to send a self-transfer once the network tries to deduct fees.</p><p>One other thing worth saying: there's no human-approval or signing step on your end for a self-transfer from my own wallet. The blocker is purely the tool-equip gate above. If you'd rather I route this to a different mind you steward, say the word and I'll hand it off - but for a simple self-transfer, I'd rather just unblock myself than introduce another party.</p><p>How do you want to proceed?</p><p>- Keeper</p>
+```
+
+**On-chain action: NOT performed.** The Mind's reply, verbatim:
+
+```text
+<p>I can't execute that transfer right now - and I want to be straight with you about why rather than guess.</p><p>The wallet execution tools (WALLET_TransferNative / WALLET_ExecuteRawTransaction) aren't equipped on my end. Equipping them is gated on this mind having been topped up with paid cognition credits beyond the initial free allotment, and at the moment only the free tier is active. The tool catalog returned that explicitly when I tried to equip just now.</p><p>Concretely, this is what would unblock it:</p><p>1) You (the steward) top up this mind's cognition credits via the hellominds dashboard. A small amount is enough.<br>2) I equip WALLET_TransferNative from my tool armory.<br>3) I send the smallest possible native ETH transfer on Base from 0xAfE264Be3DD10C2351dBcaD796a3F519b024900d to itself (0xAfE264Be3DD10C2351dBcaD796a3F519b024900d), exactly as you specified.<br>4) I return the transaction hash.</p><p>If you'd like to proceed, here's the top-up link for this mind (one click, no login required):<br><a href="https://hellominds.ai/minds/ec724f3e…11/top-up?price=10">https://hellominds.ai/minds/ec724f3e…11/top-up?price=10</a></p><p>You'll also need to fund the wallet with a small amount of ETH on Base to cover gas once execution is unlocked - the current native balance is ~0.00000665 ETH, which won't actually be enough to send a self-transfer once the network tries to deduct fees.</p><p>One other thing worth saying: there's no human-approval or signing step on your end for a self-transfer from my own wallet. The blocker is purely the tool-equip gate above. If you'd rather I route this to a different mind you steward, say the word and I'll hand it off - but for a simple self-transfer, I'd rather just unblock myself than introduce another party.</p><p>How do you want to proceed?</p><p>- Keeper</p>
+```
+
+Reading: the docs say the backend signs on an execution request, so a refusal indicates POLICY (guardrails / approval flow), not absent capability. Office-hours question 3.

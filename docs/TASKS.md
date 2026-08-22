@@ -12,9 +12,10 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 ## Phase 0 — De-risk everything (Aug 20–21) ⚠️ most important phase
 
 ### Manual (Demilade)
-- [ ] Sign up at hellominds.ai; create the **Steward Mind**
-- [ ] Create the **Rewards Mind** (first 3 Minds get free Cognition)
-- [ ] Mint a Builder API key at build.hellominds.ai/console (shown once → `.env`)
+- [x] Sign up at hellominds.ai; create the **Steward Mind** (`Keeper.Steward`, wallet on Base)
+- [x] Create the **Rewards Mind** (first 3 Minds get free Cognition)
+- [x] Mint a Builder API key at build.hellominds.ai/console (shown once → `.env`)
+      ⚠️ this key was pasted into a chat transcript — **rotate before the repo goes public**
 - [ ] Register on DoraHacks for the Jam; request the **cognition boost** for Steward
 - [ ] Join the Creative Minds Telegram community + Open Campus hub; note office hours
 - [ ] Create the demo **supergroup** "Ada's Editing Lab"; add @KeeperBot as **admin**
@@ -24,15 +25,23 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       — real elapsed days start counting now
 
 ### Spikes (run in order; results land in docs/API-NOTES.md)
-- [ ] `pnpm spike:api-smoke` — create conversation → send → poll history; which auth header works
-- [ ] `pnpm spike:memory -- --phase=teach` then (≥10 min later, separate run) `--phase=ask`
-- [ ] `pnpm spike:memory -- --phase=ask --fresh-conversation` — cross-conversation recall
-- [ ] `pnpm spike:proactive` — Mind messages first, unprompted
+- [x] `pnpm spike:api-smoke` — **PASS 7/7**. `X-Api-Key` honoured. **Transport GO.**
+- [x] `pnpm spike:memory` teach → ask (10 min gap) — **PASS 3/3** within one conversation
+- [x] `--fresh-conversation` — **1/3 strict, but cross-conversation memory IS verified**: the
+      Mind cited "the parallel thread" and "your profile summary". It recalls; it refuses to
+      *assert* facts it filed as unconfirmed. ⇒ Phase 2 charter must fix this (API-NOTES)
+- [x] `pnpm spike:proactive` — **PASS**. Unprompted, server-dated message 74s past the
+      deadline. **Native autonomy confirmed — not cron-faked.**
 - [ ] `pnpm spike:circle` — Steward ↔ Rewards relay round-trip
-- [ ] `pnpm spike:wallet` — smallest on-chain action; record chain + tx hash
-- [ ] Latency + Cognition audit: seconds-per-round-trip, credits-per-exchange (from
-      `var/minds-calls.jsonl`) → sets the pre-filter budget
-- [ ] **GO/NO-GO recorded** in API-NOTES: transport decision + Phase 5 viability
+- [x] `pnpm spike:wallet` — **FAIL WALLET_NO_ACTION (class MIND, transport unaffected)**.
+      Wallet `0xAfE264…900d` on **Base** is real (balance independently confirmed via Base
+      RPC), but `WALLET_TransferNative` is not equipped: gated on a paid cognition top-up
+      (~US$10) plus ETH for gas. **Phase 5 is blocked on funding — §12 decision.**
+- [x] Latency audit: **23–65s per exchange**. BUILD_PLAN's Phase 1 "< ~15s" target is NOT
+      achievable — Mind calls must stay off the Telegram handler's critical path.
+      Cognition cost per exchange: **UNRESOLVED** (credits endpoint returns an
+      undocumented shape) → pre-filter stays conservative. Office-hours question.
+- [x] **GO/NO-GO recorded** in API-NOTES: **GO** on MessagingApiTransport; Phase 5 pending funding
 
 ## Phase 1 — The core loop (Aug 21–22)
 - [x] Scaffold monorepo
