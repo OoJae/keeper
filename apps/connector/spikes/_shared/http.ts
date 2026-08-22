@@ -235,11 +235,30 @@ export const BuilderMindSchema = z
     species: z.string().optional(),
     isEnabled: z.boolean().optional(),
     hasTelegram: z.boolean().optional(),
-    telegramBotId: z.string().optional(),
-    walletAddress: z.string().nullable().optional(),
-    chain: z.string().nullable().optional(),
+    telegramBotId: z.union([z.string(), z.number()]).nullish(),
+    // LIVE-VERIFIED 2026-08-22: this deployment returns the PLURAL `walletAddresses` and
+    // `chains` (each a single string, despite the name). The npm .d.ts documents the
+    // singular forms, so accept both and let the caller prefer whichever is present.
+    walletAddress: z.string().nullish(),
+    chain: z.string().nullish(),
+    walletAddresses: z.union([z.string(), z.array(z.string())]).nullish(),
+    chains: z.union([z.string(), z.array(z.string())]).nullish(),
   })
   .passthrough();
+
+/** First wallet address the platform reports, under either the singular or plural key. */
+export function walletAddressOf(mind: BuilderMind): string | null {
+  const raw = mind.walletAddress ?? mind.walletAddresses ?? null;
+  const value = Array.isArray(raw) ? (raw[0] ?? null) : raw;
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+/** Chain the platform reports, under either the singular or plural key. */
+export function chainOf(mind: BuilderMind): string | null {
+  const raw = mind.chain ?? mind.chains ?? null;
+  const value = Array.isArray(raw) ? (raw[0] ?? null) : raw;
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
 
 export type BuilderMind = z.infer<typeof BuilderMindSchema>;
 

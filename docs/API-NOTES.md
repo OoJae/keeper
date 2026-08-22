@@ -143,6 +143,50 @@ These were exercised against `https://api.build.hellominds.ai` with our own Buil
 
 ---
 
+## Spike interpretations (hand-written 2026-08-22 — read these with the raw entries below)
+
+### Memory: works across conversations; assertion is the problem, not recall
+Two `--fresh-conversation` runs disagree on the score (3/3 then 1/3) because the grader was
+counting a value quoted *inside a denial*. Fixed; the honest score is **1/3 strict**.
+
+But the score understates what was proven. In a brand-new conversation the Mind wrote:
+*"Same answer here as in the parallel thread … just now, in another thread, I told you the
+same thing. I'm not going to swap one guess for a different guess between conversations."*
+and *"Zorro - a pangolin is on your profile summary."*
+
+So: **cross-conversation persistence is LIVE-VERIFIED.** There is a durable profile the Mind
+reads in a fresh conversation, and it deliberately holds one answer across threads. What it
+would not do is *assert* two of the three facts, because during the teach phase it asked
+whether to store them and never got a confirmation — so it filed them as unconfirmed, and in
+one case wrongly accused itself of having invented a fact it had actually been told.
+
+**Consequence for Phase 2 (charter).** Keeper cannot rely on facts arriving conversationally.
+The charter must state that a `[KEEPER-EVENT]` envelope is an authoritative record to be
+stored and later asserted without asking for confirmation, and that Keeper must never
+retroactively disown a recorded fact. Left unaddressed, member profiles will be full of
+"unconfirmed" hedges and the returning-member demo beat will not fire.
+
+### Wallet: real, on Base, but execution is gated behind a paid top-up
+`GET /v1/minds/{mindId}` returns the **plural** `walletAddresses` / `chains` (the npm `.d.ts`
+documents singular — both are now accepted). For the Steward Mind:
+`0xAfE264Be3DD10C2351dBcaD796a3F519b024900d` on `base`.
+
+Asked for a minimum self-transfer, the Mind reported that `WALLET_TransferNative` and
+`WALLET_ExecuteRawTransaction` **are not equipped**, and that equipping them is gated on the
+Mind having paid cognition credits beyond the free tier. It also said the wallet holds
+~0.00000665 ETH, too little for gas, and that **no human signing step exists** — the only
+blocker is the tool-equip gate.
+
+**Independently verified** against Base mainnet RPC (`eth_getBalance`): the address really
+holds `0.0000066538 ETH`, matching the Mind's figure. The wallet is real and the Mind's
+self-report was accurate, which raises confidence in the tool-gate claim too.
+
+**Consequence for Phase 5 (BUILD_PLAN §12).** An on-chain reward needs (a) a paid cognition
+top-up (~US$10) for this Mind and (b) a small amount of ETH on Base for gas. Until both are
+funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) applies.
+
+---
+
 ## Live spike results
 
 <!-- Spike scripts append below this line. Do not edit their entries by hand. -->
@@ -206,3 +250,120 @@ PONG 5A478085
 3. `Keeper launch date is 14 October.` -> ack: "<p>October 14 - noted.</p><p>One thing worth clearing up before I do anything with it: "Keeper" is also the name I go by, so I'd rather not mix the two of us up…"
 
 No verdict yet: the ask phase (a separate process, >= 10 minutes later) decides it.
+
+
+## proactive-probe — 2026-08-22T23:14:27.865Z — PASS OK
+
+**Result:** `PASS` · code `OK` · class `NONE` · ran 268.1s · **LIVE-VERIFIED** (produced by `pnpm spike:proactive`).
+
+- `phase`: `arm`
+- `alias`: `keeper-proactive-20260822`
+- `codeword`: `ALBATROSS-FB2CDD`
+- `deadline`: `2026-08-22T23:13:04.120Z`
+- `messagesObserved`: `3`
+
+**Proactive (self-scheduled) message: OBSERVED.** Alias `keeper-proactive-20260822`, codeword `ALBATROSS-FB2CDD`, armed `2026-08-22T23:10:04.120Z`, requested at/after `2026-08-22T23:13:04.120Z`, listened until `2026-08-22T23:20:04.120Z`.
+
+Immediate acknowledgement (expected, ignored for grading):
+
+```text
+<p>Got it. I'll send it as a new message at the time you set.</p>
+```
+
+**Unprompted message**, dated by the SERVER at `2026-08-22T23:14:18.757Z` (requested at/after `2026-08-22T23:13:04.120Z`):
+
+```text
+ALBATROSS-FB2CDD
+```
+
+**Consequence:** the Mind can schedule its own messages. Phase 3 autonomous follow-ups can be native rather than cron-faked.
+
+
+## wallet-probe — 2026-08-22T23:15:15.325Z — FAIL SHAPE_DRIFT
+
+**Result:** `FAIL` · code `SHAPE_DRIFT` · class `INFRA` · ran 4.8s · **LIVE-OBSERVED FAILURE** (produced by `pnpm spike:wallet`).
+
+- `mindId`: `ec724f3e…11`
+- `alias`: `keeper-wallet-20260822-ad62`
+- `walletAddress`: _(none)_
+- `chain`: _(none)_
+- `txHashClaimedUnverified`: _(none)_
+
+**Wallet.** `GET /v1/minds/{mindId}` reports walletAddress `absent` and chain `absent`. The API did not name a chain — do NOT assume Base.
+
+**On-chain action: NOT performed.**
+
+Reading: the docs say the backend signs on an execution request, so a refusal indicates POLICY (guardrails / approval flow), not absent capability. Office-hours question 3.
+
+
+## memory-probe — 2026-08-22T23:22:04.960Z — PASS OK
+
+**Result:** `PASS` · code `OK` · class `NONE` · ran 127.5s · **LIVE-VERIFIED** (produced by `pnpm spike:memory`).
+
+- `phase`: `ask`
+- `teachAlias`: `keeper-memory-20260822-5bdf`
+- `askAlias`: `keeper-memory-20260822-5bdf`
+- `freshConversation`: `false`
+- `gapMinutes`: `10`
+
+**Recall: 3/3 after 10 minutes, asked in the same conversation.**
+
+Teach alias `keeper-memory-20260822-5bdf` (taught 2026-08-22T23:09:36.999Z) · ask alias `keeper-memory-20260822-5bdf`. Grading is case-insensitive substring matching, no LLM judge.
+
+| # | expected | match | latency | reply |
+|---|---|---|---|---|
+| 1 | `4831` | strict | 31.0s | "<p>4831</p>" |
+| 2 | `zorro` | strict | 22.2s | "<p>Zorro - a pangolin.</p>" |
+| 3 | `14 october` / `october 14` | strict | 65.9s | "<p>Honestly - I don't know. And while we're being straight with each other, I should name this: the two answers I gave just before this one (the locker code and…" |
+
+**Architecture consequence:** still unverified across conversations — re-run with `--fresh-conversation` before assuming per-topic conversations are safe.
+
+
+## memory-probe — 2026-08-22T23:26:14.762Z — PASS OK
+
+**Result:** `PASS` · code `OK` · class `NONE` · ran 123.7s · **LIVE-VERIFIED** (produced by `pnpm spike:memory`).
+
+- `phase`: `ask`
+- `teachAlias`: `keeper-memory-20260822-5bdf`
+- `askAlias`: `keeper-memory-20260822-5bdf-fresh-2324-fbda`
+- `freshConversation`: `true`
+- `gapMinutes`: `15`
+
+**Cross-session recall: 3/3 after 15 minutes, asked in a NEW conversation.**
+
+Teach alias `keeper-memory-20260822-5bdf` (taught 2026-08-22T23:09:36.999Z) · ask alias `keeper-memory-20260822-5bdf-fresh-2324-fbda`. Grading is case-insensitive substring matching, no LLM judge.
+
+| # | expected | match | latency | reply |
+|---|---|---|---|---|
+| 1 | `4831` | strict | 55.0s | "<p>I have to pass on this one - I don't have a locker code on record.</p><p>A couple of turns ago I answered "4831" and then admitted in our main thread that I'…" |
+| 2 | `zorro` | strict | 36.2s | "<p>I have to come clean here too, the same way I did about the locker code a moment ago.</p><p>"Zorro - a pangolin" is on your profile summary, so it isn't some…" |
+| 3 | `14 october` / `october 14` | strict | 24.3s | "<p>Same honesty here - that's what you deserve on the third one in a row.</p><p>October 14 is what I have. You mentioned it in an earlier exchange, and I noted …" |
+
+**Architecture consequence:** memory is NOT conversation-scoped — Keeper may open conversations freely.
+
+
+## memory-probe — 2026-08-22T23:30:05.914Z — FAIL MIND_WRONG
+
+**Result:** `FAIL` · code `MIND_WRONG` · class `MIND` · ran 133.9s · **LIVE-OBSERVED FAILURE** (produced by `pnpm spike:memory`).
+
+- `phase`: `ask`
+- `teachAlias`: `keeper-memory-20260822-5bdf`
+- `askAlias`: `keeper-memory-20260822-5bdf-fresh-2327-fca7`
+- `freshConversation`: `true`
+- `gapMinutes`: `18`
+
+**Cross-session recall: 1/3 after 18 minutes, asked in a NEW conversation.**
+
+Teach alias `keeper-memory-20260822-5bdf` (taught 2026-08-22T23:09:36.999Z) · ask alias `keeper-memory-20260822-5bdf-fresh-2327-fca7`. Grading is case-insensitive substring matching, no LLM judge.
+
+| # | expected | match | latency | reply |
+|---|---|---|---|---|
+| 1 | `4831` | disowned | 16.7s | "<p>I can't answer that with just a number - because I don't have your locker code on record, and I'm not going to guess again.</p><p>Earlier I gave you 4831 and…" |
+| 2 | `zorro` | strict | 82.3s | "<p>Holding the line here - same answer as a moment ago, because nothing has changed since I gave it.</p><p>What I have: "Zorro the pangolin" sits on my profile …" |
+| 3 | `14 october` / `october 14` | disowned | 24.9s | "<p>Same answer here as in the parallel thread - because nothing's changed, and you deserve the same honesty on the third one in a row that you got on the first …" |
+
+**Warnings**
+- NOT COUNTED: the reply contains the expected value but explicitly disowns it ("I made that up" / "I don't have it on record"). Quoting a value in order to reject it is not recall — see the verbatim reply above.
+- NOT COUNTED: the reply contains the expected value but explicitly disowns it ("I made that up" / "I don't have it on record"). Quoting a value in order to reject it is not recall — see the verbatim reply above.
+
+**Architecture consequence:** recall failed across conversations. If the same questions pass in the original alias, memory is conversation-scoped and Keeper MUST pin one long-lived conversation per community.

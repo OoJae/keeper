@@ -18,7 +18,14 @@ import { randomBytes } from 'node:crypto';
 import { createMindClient } from '@keeper/minds-client';
 
 import { loadSpikeEnv } from './_shared/env.js';
-import { describe, fetchMindDetail, summarizeResponse, type BuilderMind } from './_shared/http.js';
+import {
+  chainOf,
+  describe,
+  fetchMindDetail,
+  summarizeResponse,
+  walletAddressOf,
+  type BuilderMind,
+} from './_shared/http.js';
 import { appendToApiNotes } from './_shared/notes.js';
 import { fenced, reporter, shortId, type SpikeReporter } from './_shared/report.js';
 import {
@@ -132,8 +139,8 @@ async function main(): Promise<void> {
         ctx.mind = detail.mind;
         // Trimmed at the boundary: the exact string the platform reported, minus padding,
         // is the only thing that may ever become a transfer destination.
-        ctx.walletAddress = detail.mind.walletAddress?.trim() ?? null;
-        ctx.chain = detail.mind.chain ?? null;
+        ctx.walletAddress = walletAddressOf(detail.mind);
+        ctx.chain = chainOf(detail.mind);
         r.info(`wallet fields: walletAddress=${ctx.walletAddress ?? 'absent'} chain=${ctx.chain ?? 'absent'}`);
 
         if (rewardsId !== undefined && rewardsId !== mindId) {
@@ -144,10 +151,10 @@ async function main(): Promise<void> {
             preference: env.authHeaderPreference,
           });
           r.raw('rewards-mind-detail', summarizeResponse(other.response));
-          ctx.rewardsHasWallet = Boolean(other.mind?.walletAddress);
+          ctx.rewardsHasWallet = other.mind !== null && walletAddressOf(other.mind) !== null;
           r.info(
-            `Rewards Mind ${shortId(rewardsId)}: walletAddress=${other.mind?.walletAddress ?? 'absent'} ` +
-              `chain=${other.mind?.chain ?? 'absent'}`,
+            `Rewards Mind ${shortId(rewardsId)}: walletAddress=${(other.mind && walletAddressOf(other.mind)) ?? 'absent'} ` +
+              `chain=${(other.mind && chainOf(other.mind)) ?? 'absent'}`,
           );
         }
 

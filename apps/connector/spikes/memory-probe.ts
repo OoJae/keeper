@@ -103,7 +103,7 @@ interface FactResult {
   expected: string[];
   reply: string | null;
   /** `stale` = history handed back a message that already existed before we asked. */
-  match: 'strict' | 'loose' | 'miss' | 'silent' | 'stale';
+  match: 'strict' | 'loose' | 'miss' | 'silent' | 'stale' | 'disowned';
   latencyMs: number;
 }
 
@@ -393,6 +393,12 @@ async function askPhase(transport: MindTransport, identity: MindIdentity): Promi
               'The forward-only `after` cursor handed us an OLD message. Whatever it contains is ' +
               'our own taught text coming back, not recall.',
           );
+        } else if (match === 'disowned') {
+          r.warn(
+            'NOT COUNTED: the reply contains the expected value but explicitly disowns it ' +
+              '("I made that up" / "I don\'t have it on record"). Quoting a value in order to ' +
+              'reject it is not recall — see the verbatim reply above.',
+          );
         } else r.warn(`no expected substring in the reply (wanted "${fact.expectedSubstrings.join('" / "')}")`);
       },
     })),
@@ -468,9 +474,37 @@ async function askPhase(transport: MindTransport, identity: MindIdentity): Promi
 
 // --- helpers ----------------------------------------------------------------
 
+/**
+ * A Mind that says "I don't have a locker code on record - a few turns ago I answered
+ * 4831 and I'd made it up" contains the expected substring while explicitly DISOWNING it.
+ * LIVE-OBSERVED 2026-08-22: this exact reply scored a clean STRICT and inflated a
+ * cross-conversation verdict to 3/3. Quoting a value in order to reject it is not recall.
+ */
+const DISOWN_PATTERNS: readonly RegExp[] = [
+  /\bi (?:made|make) (?:that|it|those) up\b/i,
+  /\bi\s?(?:'|’)?m not going to (?:fabricate|guess|invent)\b/i,
+  /\bfabricat/i,
+  /\bi (?:don'?t|do not) (?:have|hold) [^.?!]{0,60}\bon record\b/i,
+  /\bi (?:don'?t|do not) actually (?:have|know)\b/i,
+  /\bi have to (?:pass|come clean)\b/i,
+  /\bwasn'?t based on anything\b/i,
+  /\bi shouldn'?t have (?:filled|made)\b/i,
+  /\bthat was (?:a )?(?:guess|invention)\b/i,
+];
+
+function isDisowned(text: string): boolean {
+  return DISOWN_PATTERNS.some((re) => re.test(text));
+}
+
 function grade(text: string | null, strict: string[], loose: string[]): FactResult['match'] {
   if (text === null) return 'silent';
   const haystack = text.toLowerCase();
+  const hit =
+    strict.some((needle) => haystack.includes(needle.toLowerCase())) ||
+    loose.some((needle) => haystack.includes(needle.toLowerCase()));
+  // Check the disclaimer only when something matched: a denial with no value in it is an
+  // ordinary miss, and conflating the two would hide which way the Mind failed.
+  if (hit && isDisowned(text)) return 'disowned';
   if (strict.some((needle) => haystack.includes(needle.toLowerCase()))) return 'strict';
   if (loose.some((needle) => haystack.includes(needle.toLowerCase()))) return 'loose';
   return 'miss';
