@@ -310,4 +310,24 @@ describe('gateDirective', () => {
       expect(result.warnings).not.toContain('unfenced_directive');
     }
   });
+
+  it('recovers a directive whose quotes are HTML-entity escaped', () => {
+    // The live platform returns HTML replies (docs/API-NOTES.md, 2026-08-22), so a
+    // directive can arrive entity-escaped. Losing it would silently disable Keeper.
+    const reply =
+      '<p>{&quot;action&quot;:&quot;reply&quot;,&quot;message&quot;:&quot;hi&quot;,' +
+      '&quot;reasoning&quot;:&quot;r&quot;,&quot;confidence&quot;:&quot;high&quot;}</p>';
+    const result = extractDirective(reply);
+    expect(result.kind).toBe('ok');
+    expect(result.directive).toMatchObject({ action: 'reply', message: 'hi' });
+  });
+
+  it('leaves a valid payload untouched, entities and all', () => {
+    // This parses on the first attempt, so the repair pass never runs and nothing is
+    // decoded: entity text inside a valid directive survives verbatim.
+    const reply = '{"action":"reply","message":"a &amp;quot;b","reasoning":"r","confidence":"high"}';
+    const result = extractDirective(reply);
+    expect(result.kind).toBe('ok');
+    expect(result.directive).toMatchObject({ action: 'reply', message: 'a &amp;quot;b' });
+  });
 });

@@ -109,3 +109,63 @@ for manual poking if you install it outside the repo.
 ## Live spike results
 
 <!-- Spike scripts append below this line. Do not edit their entries by hand. -->
+
+
+## api-smoke — 2026-08-22T23:06:20.661Z — PASS OK
+
+**Result:** `PASS` · code `OK` · class `NONE` · ran 32.2s · **LIVE-VERIFIED** (produced by `pnpm spike:api-smoke`).
+
+- `baseUrl`: `https://api.build.hellominds.ai`
+- `authHeaderHonored`: `X-Api-Key`
+- `authHeadersTried`: `X-Api-Key`
+- `alias`: `keeper-smoke-20260822`
+- `mindId`: `ec724f3e…11`
+- `replyLatencyMs`: `23017`
+- `cognitionBefore`: _(none)_
+- `cognitionAfter`: _(none)_
+
+**Auth header: this deployment honors `X-Api-Key`.** Set `MINDS_AUTH_HEADER=x-api-key` in `.env`.
+
+| Call | Verified |
+|---|---|
+| `GET /v1/messaging/conversations` (raw fetch, no adapter) | yes |
+| adapter `healthCheck()` | yes |
+| `ensureConversation(alias)` | yes |
+| `POST /v1/messaging/message` | yes |
+| Mind reply within 120s | yes (23.0s) |
+| `GET /v1/minds/{mindId}/credits` | NO |
+
+**Send response shape** (was undocumented). Top-level keys: `alias`, `conversationId`, `messageId`, `artifactIds`. History cursor extracted by the adapter: `null`.
+
+**Mind reply** (23.0s, sender=`mind`, echoed `PONG 5A478085`: yes):
+
+```text
+PONG 5A478085
+```
+
+**Warnings**
+- credits body did not match CognitionBalance {mindId, cognition} — {"mindId":"ec724f3e…11","swarm":172.15719064,"credits":0,"creditsMinted":-13.61123336,"creditsStaged":185.768424,"num":60}
+- credits body did not match CognitionBalance {mindId, cognition} — {"mindId":"ec724f3e…11","swarm":172.15719064,"credits":0,"creditsMinted":-13.61123336,"creditsStaged":185.768424,"num":60}
+- credits endpoint unavailable — cognition accounting stays unverified. Non-fatal: it does not affect the transport decision.
+- POST /v1/messaging/message yielded no history cursor (fingerprint). awaitReply must then scan history from the tail instead of using after=<cursor> — slower and racier. Record this: it shapes the connector poll loop.
+- credits body did not match CognitionBalance {mindId, cognition} — {"mindId":"ec724f3e…11","swarm":171.06323516,"credits":0,"creditsMinted":-14.70518884,"creditsStaged":185.768424,"num":67}
+- cannot compute a per-exchange cognition delta — credits endpoint unavailable.
+
+**Transport decision:** **GO** on `MessagingApiTransport`.
+
+
+## memory-probe — 2026-08-22T23:09:37.001Z — PASS OK
+
+**Result:** `PASS` · code `OK` · class `NONE` · ran 164.6s · **LIVE-VERIFIED** (produced by `pnpm spike:memory`).
+
+- `phase`: `teach`
+- `alias`: `keeper-memory-20260822-5bdf`
+- `runId`: `20260822-5bdf`
+
+**Teach phase.** Sent 3 nonce-bearing facts to alias `keeper-memory-20260822-5bdf`, each awaited an ack.
+
+1. `My locker code is 4831.` -> ack: "<p>Got it - I heard you.</p><p>Before I do anything with a code like that, I want to check with you: would you like me to actually hold onto it somewhere safe f…"
+2. `Our community mascot is a pangolin named Zorro.` -> ack: "<p>Okay, I'm picturing it now. Zorro the pangolin. There's something I like about that - a mascot that's armored on the outside and quiet about it. Pangolins do…"
+3. `Keeper launch date is 14 October.` -> ack: "<p>October 14 - noted.</p><p>One thing worth clearing up before I do anything with it: "Keeper" is also the name I go by, so I'd rather not mix the two of us up…"
+
+No verdict yet: the ask phase (a separate process, >= 10 minutes later) decides it.

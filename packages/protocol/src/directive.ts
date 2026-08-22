@@ -113,8 +113,24 @@ function collectCandidates(text: string, bounded: string): Candidate[] {
   return out.slice(0, MAX_CANDIDATES);
 }
 
-function repair(raw: string): string {
+/**
+ * The live Minds platform returns replies as HTML (LIVE-VERIFIED 2026-08-22, see
+ * docs/API-NOTES.md), so a directive can arrive with its quotes entity-escaped. Decoded
+ * only on the repair path, i.e. after a plain JSON.parse has already failed — a valid
+ * payload is never rewritten. `&amp;` is decoded last so `&amp;quot;` cannot become a quote.
+ */
+function decodeHtmlEntities(raw: string): string {
   return raw
+    .replace(/&quot;|&#0*34;|&#x0*22;/gi, '"')
+    .replace(/&apos;|&#0*39;|&#x0*27;/gi, "'")
+    .replace(/&lt;|&#0*60;/gi, '<')
+    .replace(/&gt;|&#0*62;/gi, '>')
+    .replace(/&nbsp;|&#0*160;/gi, ' ')
+    .replace(/&amp;|&#0*38;/gi, '&');
+}
+
+function repair(raw: string): string {
+  return decodeHtmlEntities(raw)
     .replace(/^\s*json\s*/i, '')
     .replace(/[“”„‟]/g, '"')
     .replace(/[‘’‚‛]/g, "'")
