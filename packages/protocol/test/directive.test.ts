@@ -322,6 +322,34 @@ describe('gateDirective', () => {
     expect(result.directive).toMatchObject({ action: 'reply', message: 'hi' });
   });
 
+  it('treats an HTML code block as a fence, because that is what the platform sends', () => {
+    // The Mind writes a markdown fence; the platform renders it into <pre><code> with the
+    // JSON entity-escaped. Reading that as unfenced would make the connector refuse every
+    // delete/warn/mute/reward the Steward ever issues (see pipeline/executor.ts).
+    const reply =
+      '<p>Clear link-drop from a day-old account.</p>\n' +
+      '<pre><code class="language-json">{\n' +
+      '  &quot;action&quot;: &quot;delete&quot;,\n' +
+      '  &quot;target_member&quot;: &quot;@dr0pshipper_99&quot;,\n' +
+      '  &quot;reasoning&quot;: &quot;link-drop spam&quot;,\n' +
+      '  &quot;confidence&quot;: &quot;high&quot;\n' +
+      '}\n</code></pre>';
+    const result = extractDirective(reply);
+    expect(result.kind).toBe('ok');
+    expect(result.directive).toMatchObject({ action: 'delete', target_member: '@dr0pshipper_99' });
+    if (result.kind !== 'ok') return;
+    expect(result.warnings).not.toContain('unfenced_directive');
+  });
+
+  it('reads a bare <code> block as fenced too', () => {
+    const result = extractDirective(
+      '<p>Done.</p><code>{"action":"none","reasoning":"banter","confidence":"high"}</code>',
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.warnings).not.toContain('unfenced_directive');
+  });
+
   it('leaves a valid payload untouched, entities and all', () => {
     // This parses on the first attempt, so the repair pass never runs and nothing is
     // decoded: entity text inside a valid directive survives verbatim.

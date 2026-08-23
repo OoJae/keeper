@@ -23,6 +23,11 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [ ] `/start` the bot in DM as the creator account (required before it can DM digests)
 - [ ] Invent/confirm the cast (BUILD_PLAN §9) and post **Day 1 seeded history**
       — real elapsed days start counting now
+- [x] Day scripts written through recording day (days 1-7, `apps/seeder/src/cast.ts`);
+      `pnpm seed:day <n>` posts/prints them, `apps/seeder/README.md` covers how one
+      builder drives six cast accounts and why timestamps are never faked
+- [ ] Post day 4 (Aug 23) · [ ] day 5 (Aug 24) · [ ] day 6 (Aug 25) · [ ] day 7 (Aug 26)
+      — ten minutes each, from the real cast accounts (`pnpm seed:day <n> --script`)
 
 ### Spikes (run in order; results land in docs/API-NOTES.md)
 - [x] `pnpm spike:api-smoke` — **PASS 7/7**. `X-Api-Key` honoured. **Transport GO.**
@@ -48,17 +53,25 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [x] `packages/protocol` — envelope + directive types, zod schemas, unit tests
 - [x] `packages/minds-client` — transport interface, Messaging API transport, relay stub,
       per-call cognition/latency logging
-- [ ] grammY bot in the demo group: capture messages, joins, member metadata
-- [ ] Envelope builder (computes `first_seen`/`last_seen` from the mirror DB)
-- [ ] Pre-filter (joins, heuristics, 1-in-N ambient sampling, creator commands, schedules)
-- [ ] Directive parser wired in with `none` fallback on parse failure
-- [ ] Honour `unfenced_directive`: a directive recovered from bare prose (not a fenced
+- [x] grammY bot in the demo group: capture messages, joins, member metadata
+      (`apps/connector/src/telegram/bot.ts` — long polling, auto-retry, `chat_member` in
+      `allowed_updates`, admin-rights self-check, SIGTERM/SIGINT via `bot.stop()`)
+- [x] Envelope builder (computes `first_seen`/`last_seen` from the mirror DB)
+- [x] Pre-filter (joins, heuristics, 1-in-N ambient sampling, creator commands, schedules)
+      — daily Cognition cap is enforced, with a reserve for joins/returns/creator commands
+- [x] Directive parser wired in with `none` fallback on parse failure
+- [x] Honour `unfenced_directive`: a directive recovered from bare prose (not a fenced
       block) may be the Mind *quoting a member*, not ordering us. Require a fence for
       destructive actions (`delete`/`mute`/`warn`/`reward`) — otherwise a member can type
       JSON and have it executed. Treat as flag_creator instead.
-- [ ] Executors: reply, delete, warn, flag_creator (DM creator)
-- [ ] SQLite mirror: members, events, actions tables
-- [ ] **Accept:** group message → context-aware reply end-to-end < ~15s; log shows reasoning
+- [x] Executors: reply, delete, warn, flag_creator (DM creator, falling back to an
+      in-group ping on the 403 you get until the creator has `/start`ed the bot).
+      `mute`/`reward` are honest stubs: they log and flag rather than silently no-op.
+- [x] SQLite mirror: members, events, actions tables (+ settings, for the pause switch)
+- [ ] **Accept:** group message → context-aware reply end-to-end; log shows reasoning
+      — blocked on the demo group + bot token existing. **The "< ~15s" half of this
+      criterion is void**: measured Mind latency is 23–65s (docs/API-NOTES.md), so the
+      handler returns immediately and the exchange runs on a per-chat queue instead.
 
 ## Phase 2 — Teach Keeper the community (Aug 22)
 - [ ] Write `docs/STEWARD-CHARTER.md` (role, envelope format, directive format, norms,
@@ -77,9 +90,14 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [ ] **Accept:** all five fired with real timestamps, screenshotted into `docs/EVIDENCE/`
 
 ## Phase 4 — Human override + moderation log (Aug 23)
-- [ ] `/keeper pause`, `/keeper resume`, `/keeper undo`, `/keeper why`
-- [ ] Moderation log complete: action + reasoning + confidence + override status
+- [x] `/keeper pause`, `/keeper resume`, `/keeper undo`, `/keeper why` (plus `/keeper status`
+      and `/keeper ask`). Handled entirely in the connector — no Mind call — so they still
+      answer when the Mind is slow or out of credits.
+- [x] Moderation log complete: action + reasoning + confidence + gated + what we refused
+      and why + override status + the Mind's raw reply
 - [ ] **Accept:** an undo visibly reverses an action and the log reflects it
+      — covered by `apps/connector/test/executor.test.ts` + `router.test.ts`; still needs
+      one on-camera run in the real group.
 
 ## Phase 5 — Rewards Mind + Circles + on-chain reward (Aug 23–24) — P2, descopable
 - [ ] Circle: Steward ↔ Rewards Mind
@@ -98,7 +116,9 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [ ] **Accept:** a stranger understands Keeper from 30 seconds of dashboard
 
 ## Phase 7 — Demo scenario lock + video (Aug 25–26)
-- [ ] `pnpm demo:run` stages every beat in order
+- [x] `pnpm demo:run` stages every beat in order (`--dry-run` prints the run sheet
+      offline; live mode preflights the bot/group/admin rights, then waits out the
+      measured 23-66s Mind latency without ever triggering Keeper itself)
 - [ ] Voiceover scripted word-for-word (~260 words)
 - [ ] Record segments, stitch, caption; 1.5–2:00 exactly
 - [ ] Raw uncut fallback take kept

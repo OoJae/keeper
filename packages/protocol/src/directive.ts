@@ -15,6 +15,16 @@ const SNIPPET_CHARS = 200;
 
 const FENCE_RE = /```([^\n`]*)\r?\n([\s\S]*?)```/g;
 
+/**
+ * The live platform answers in HTML (LIVE-VERIFIED 2026-08-22, docs/API-NOTES.md), so the
+ * Mind's markdown fence reaches us as `<pre><code>…</code></pre>` with the JSON
+ * entity-escaped and not one backtick in sight. Treating that as unfenced would mark every
+ * real directive `unfenced_directive`, and the connector refuses destructive work from
+ * unfenced blocks — i.e. the Steward could never delete, warn, mute or reward again.
+ */
+const HTML_CODE_RE = /<(pre|code)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+const HTML_TAG_RE = /<[^>]*>/g;
+
 function truncate(s: string): string {
   return s.length > SNIPPET_CHARS ? s.slice(0, SNIPPET_CHARS) : s;
 }
@@ -101,10 +111,19 @@ function collectCandidates(text: string, bounded: string): Candidate[] {
     if (info.startsWith('json')) jsonFences.push(body);
     else otherFences.push(body);
   }
-  for (const body of jsonFences) push(body, false);
-  for (const body of otherFences) {
+  const pushFenceBody = (body: string): void => {
     if (body.trim().startsWith('{')) push(body, false);
     else for (const span of scanBalancedSpans(body, MAX_CANDIDATES)) push(span, false);
+  };
+
+  for (const body of jsonFences) push(body, false);
+  for (const body of otherFences) pushFenceBody(body);
+
+  // 3b. HTML code blocks: the same signal as a fence, because that is what the platform
+  //     renders a fence into. Inner markup is stripped so `<pre><code>` reads as one block.
+  HTML_CODE_RE.lastIndex = 0;
+  for (let m = HTML_CODE_RE.exec(bounded); m !== null; m = HTML_CODE_RE.exec(bounded)) {
+    pushFenceBody((m[2] ?? '').replace(HTML_TAG_RE, ''));
   }
 
   // 4. Balanced-brace scan of the whole (bounded) reply: bare prose, no fence.

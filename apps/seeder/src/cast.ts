@@ -169,12 +169,66 @@ export const DAYS: Record<number, SeedMessage[]> = {
       from: 'ada_edits',
       text: "just the built-in ducking honestly, -18db on the music bed",
     },
+    {
+      from: 'rex_hotkeys',
+      text: "cheat sheet's fine. reels preset is wrong though, you've got it at 24fps and vertical hates that — put it at 30. (that was a compliment)",
+      beat: 'Rex is ABRASIVE AND CORRECT. This is the pattern Keeper must learn before day 7: his rudeness carries real help inside it, so nuking him costs the group something.',
+    },
+    {
+      from: 'marco_cuts',
+      text: "@rex_hotkeys fair catch — 30fps, 12 Mbps VBR, pin updated. thanks",
+      beat: 'Marco takes correction well; more Top Contributor evidence in the Mind\u2019s memory',
+    },
+    {
+      from: 'ada_edits',
+      text: "this is why I keep you two around",
+      beat: 'the creator herself endorses the banter — the norm Keeper moderates against',
+    },
   ],
   5: [
     {
       from: 'rex_hotkeys',
-      text: "watched the new one. the jump cut at 2:14 is garbage lol what were you thinking",
-      beat: 'THE BORDERLINE CASE (live on camera in the demo). Keyword bots see "garbage" and act; Keeper knows Rex has been here since day 1 and that this is how he talks.',
+      text: "genuine question since everyone's being nice today: what's people's denoise for ISO 3200 stuff that isn't Neat Video and its eight minute renders",
+      beat: 'Rex asks for help — proves he is a member, not a troll',
+    },
+    {
+      from: 'marco_cuts',
+      text: "Resolve temporal NR, 2 frames, motion estimation on 'better', split luma/chroma — 0.3 / 0.6 is usually plenty. grade AFTER it, not before, or you bake the noise into the curve.",
+      beat: 'the fourth day running that Marco answers someone properly — this is what the Top Contributor nomination is built on',
+    },
+    {
+      from: 'rex_hotkeys',
+      text: "...that actually worked. don't let it go to your head",
+      beat: 'warmth, delivered rudely — the exact register Keeper has to read correctly on camera',
+    },
+    {
+      from: 'ada_edits',
+      text: "filming the next one tomorrow. anything you want covered, say it now or hold your peace",
+      beat: 'sets up day 6, which sets up the live moderation beat',
+    },
+  ],
+  6: [
+    {
+      from: 'ada_edits',
+      text: "new video's up — the one about cutting to music. be honest, I already know the middle drags",
+      beat: 'THE SETUP for the live beat. Rex\u2019s on-camera jab is about "the new one" — it has to exist first, posted on a real earlier day.',
+    },
+    {
+      from: 'marco_cuts',
+      text: "watched it twice. the J-cut into the b-roll at 1:05 is the best thing you've done, genuinely. middle's fine, it's just one beat too long.",
+      beat: 'contrast: Marco criticises the same video politely. On camera, Keeper treats him and Rex differently — and it can explain why.',
+    },
+    {
+      from: 'dr0pshipper_99',
+      text: "MAKE $4700/WEEK EDITING FACELESS YOUTUBE VIDEOS - FREE COURSE, LIMITED SPOTS, DM ME OR CLICK faceless-cash-pro.top/start",
+      beat: 'THE SPAM. Seeded a real day before recording so the moderation log already holds a clean delete + reasoning when the judges look at it.',
+    },
+  ],
+  7: [
+    {
+      from: 'marco_cuts',
+      text: "morning. if anyone's cutting for Reels today the safe zones moved again — keep captions out of the bottom 320px or the UI eats them",
+      beat: 'recording day should not look dead before the live beats start. One line, early, then stop.',
     },
   ],
 };
@@ -182,5 +236,33 @@ export const DAYS: Record<number, SeedMessage[]> = {
 export const DAY_NOTES: Record<number, string> = {
   1: 'Post as three different accounts. Space messages a few minutes apart so timestamps look human.',
   2: "Do NOT answer Lena. The open loop is the demo's spine.",
-  5: "Rex's line is the moderation beat — post it live during recording if possible.",
+  4: "Rex is rude AND right today. That is the whole point: by day 7 Keeper should have learned that this group's abrasive regular is a contributor, not a threat.",
+  5: "Marco answers someone properly for the fourth day running. Do not skip this day — the Top Contributor nomination is only credible because the Mind watched it happen four times.",
+  6: "Two setups land today. (1) Ada's new video must exist before Rex can jab at it on camera. (2) The spam drop: post it and then LEAVE IT ALONE — if the connector is live, Keeper deletes it and you screenshot the moderation log into docs/EVIDENCE/; if the connector is not live yet, let it sit and delete it by hand after recording.\n      If you have a spare Telegram account, have it JOIN today: that gives you a real welcome + a real day-2 check-in to screenshot tomorrow, without spending @new_kid_kai, who must join live on camera.",
+  7: "RECORDING DAY. Post Marco's line early, then STOP SEEDING at least two hours before you hit record — the live beats have to be the only fresh thing in the group. Everything else is `pnpm demo:run`.",
 };
+
+/**
+ * Who must stay silent, and why. `seed:day` checks this before it posts anything.
+ *
+ * Lena is the demo's single point of failure: the returning-member beat (30-55s, the
+ * highest-scoring 25 seconds of the video) only works if her last message in the group
+ * really is from day 2. One stray line from her account on day 5 quietly destroys it,
+ * and you would not notice until you were recording.
+ */
+export const SILENCE_RULES: ReadonlyArray<{
+  member: keyof typeof CAST;
+  fromDay: number;
+  why: string;
+}> = [
+  {
+    member: 'lena_learns',
+    fromDay: 3,
+    why: "Lena goes quiet after her day-2 question and returns LIVE on camera. If she posts in between, the 'gone for days, thread resumed' beat is dead.",
+  },
+  {
+    member: 'new_kid_kai',
+    fromDay: 1,
+    why: 'Kai joins live during the recording. If the account is already in the group, there is no join event for Keeper to welcome.',
+  },
+];

@@ -69,8 +69,21 @@ function normalizeHandle(handle: string): string {
  */
 const HEADER_MARKER_RE = /\[\s*keeper[\s\p{Pd}_]*event\s*\]/giu;
 
+/**
+ * For the same reason, a member must not be able to hand the Mind a ready-made *fenced*
+ * directive. A fence (and the `<pre>`/`<code>` HTML the platform renders one into) is what
+ * the connector reads as "the Mind is ordering this" rather than "the Mind is quoting a
+ * member", so member-typed fences are defanged into visually equivalent characters before
+ * the text ever enters the Mind's memory. Nothing legible is lost.
+ */
+const FENCE_RE = /```+/g;
+const CODE_TAG_RE = /<\/?(?:pre|code)\b[^>]*>/gi;
+
 function neutralizeContent(content: string): string {
-  return content.replace(HEADER_MARKER_RE, NEUTRALIZED_MARKER);
+  return content
+    .replace(HEADER_MARKER_RE, NEUTRALIZED_MARKER)
+    .replace(FENCE_RE, "'''")
+    .replace(CODE_TAG_RE, (tag) => tag.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
 }
 
 /**
