@@ -21,7 +21,15 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CAST, DAYS, DAY_NOTES, SILENCE_RULES, type SeedMessage } from './cast.js';
-import { describeDay, isoDate, dateForDay, timingOf, today } from './calendar.js';
+import {
+  COMPRESSION,
+  describeDay,
+  isoDate,
+  dateForDay,
+  scriptedDaysFor,
+  timingOf,
+  today,
+} from './calendar.js';
 import {
   SeederError,
   argFlag,
@@ -132,15 +140,20 @@ function resolveDay(): { day: number; script: SeedMessage[] } {
   const day = Number(arg);
   if (!Number.isInteger(day) || day < 1) {
     failBlock(`"${arg}" is not a day number.`, [
-      'Days are integers counted from Aug 20 (day 1).',
+      'Days are integers counted from Aug 24 (day 1).',
       `Scripted days: ${days.join(', ')}`,
     ]);
   }
 
-  const script = DAYS[day];
-  if (script === undefined || script.length === 0) {
-    failBlock(`No script for day ${day}.`, [
-      `Scripted days: ${days.join(', ')} (day ${day} would be ${isoDate(dateForDay(day))}).`,
+  // A real sprint day carries one or more scripted days (calendar.ts COMPRESSION): the
+  // group opened Aug 24, not Aug 20, so the seven-day script is posted across three real
+  // days rather than backdated. See the DAY_ONE comment for why backfilling is not an option.
+  const scripted = scriptedDaysFor(day);
+  const script = scripted.flatMap((n) => DAYS[n] ?? []);
+  if (script.length === 0) {
+    failBlock(`No script for real sprint day ${day}.`, [
+      `Real sprint days: ${Object.keys(COMPRESSION).join(', ')} (day ${day} would be ${isoDate(dateForDay(day))}).`,
+      `Scripted days available in cast.ts: ${days.join(', ')}.`,
       '',
       'Add one in apps/seeder/src/cast.ts — and keep it short. The point is real elapsed',
       'days, not volume: five lines a day is plenty.',
@@ -215,12 +228,18 @@ function warnIfAlreadyPosted(day: number): { posted: number } {
 // --- rendering --------------------------------------------------------------
 
 function header(day: number): void {
-  const handles = [...new Set(DAYS[day]?.map((m) => `@${CAST[m.from]?.handle ?? m.from}`) ?? [])];
+  // The real day carries several scripted days, so derive the cast from the merged script
+  // — reading DAYS[day] here would name the wrong people (and hide a silence-rule break).
+  const script = scriptedDaysFor(day).flatMap((n) => DAYS[n] ?? []);
+  const handles = [...new Set(script.map((m) => `@${CAST[m.from]?.handle ?? m.from}`))];
   process.stdout.write(
     `\n${bold(`Ada's Editing Lab — ${describeDay(day)}`)}\n` +
       `${dim(`Accounts in today's script: ${handles.join(', ')}`)}\n`,
   );
-  const note = DAY_NOTES[day];
+  const note = scriptedDaysFor(day)
+    .map((n) => DAY_NOTES[n])
+    .filter((x): x is string => x !== undefined)
+    .join('\n\n      ');
   if (note) process.stdout.write(`\n${bold('NOTE:')} ${note}\n`);
   process.stdout.write('\n');
 }

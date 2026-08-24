@@ -257,8 +257,8 @@ export const SILENCE_RULES: ReadonlyArray<{
 }> = [
   {
     member: 'lena_learns',
-    fromDay: 3,
-    why: "Lena goes quiet after her day-2 question and returns LIVE on camera. If she posts in between, the 'gone for days, thread resumed' beat is dead.",
+    fromDay: 2,
+    why: "Lena asks her export question on real day 1 (Aug 24) and returns LIVE on camera on day 4 (Aug 27). That three-day silence IS the memory demo. If she posts in between, the 'gone for days, thread resumed' beat is dead.",
   },
   {
     member: 'new_kid_kai',
