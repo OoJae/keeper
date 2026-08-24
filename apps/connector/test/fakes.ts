@@ -129,6 +129,7 @@ export function testConfig(overrides: Partial<ConnectorConfig> = {}): ConnectorC
     groupChatId: -1001,
     groupName: "Ada's Editing Lab",
     mirrorPath: ':memory:',
+    seedAttribution: false,
     mindAlias: 'keeper-steward-test',
     mindTimeoutMs: 1000,
     utcOffsetMinutes: 480,

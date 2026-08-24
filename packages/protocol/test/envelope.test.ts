@@ -186,4 +186,31 @@ describe('serializeEnvelope', () => {
     expect(() => serializeEnvelope(event({ member: { handle: '', id: 1, display: 'A' } }))).toThrow(ZodError);
     expect(() => serializeEnvelope(event({ utcOffsetMinutes: 1000 }))).toThrow(ZodError);
   });
+
+  it('accepts a negative member id (the demo harness\'s synthetic cast members)', () => {
+    // Seeded cast members get negative ids so they can never collide with a real Telegram
+    // account while still being the SAME person to the Mind across days.
+    const out = serializeEnvelope({
+      type: 'message',
+      member: { handle: 'lena_learns', id: -2000123456, display: 'Lena' },
+      firstSeen: new Date('2026-08-24T00:00:00Z'),
+      ts: new Date('2026-08-24T12:00:00Z'),
+      group: "Ada's Editing Lab",
+      content: 'exports are choppy',
+    });
+    expect(out).toContain('member: @lena_learns (id:-2000123456, display:"Lena")');
+  });
+
+  it('rejects a member id of 0, which identifies nobody', () => {
+    expect(() =>
+      serializeEnvelope({
+        type: 'message',
+        member: { handle: 'x', id: 0, display: 'X' },
+        firstSeen: new Date('2026-08-24T00:00:00Z'),
+        ts: new Date('2026-08-24T12:00:00Z'),
+        group: 'g',
+        content: 'hi',
+      }),
+    ).toThrow();
+  });
 });

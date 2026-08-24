@@ -15,6 +15,7 @@ import { MindsConfigError, createMindClient } from '@keeper/minds-client';
 
 import { ConnectorConfigError, loadConnectorConfig } from './config.js';
 import { Mirror } from './db/mirror.js';
+import { SeedInbox } from './seed-inbox.js';
 import { log } from './log.js';
 import { SequentialQueue } from './pipeline/queue.js';
 import { createConnector } from './telegram/bot.js';
@@ -47,6 +48,17 @@ async function main(): Promise<void> {
 
   const runtime = await createConnector({ config, mirror, transport: minds.transport, queue });
 
+  // Seeded history arrives by file, not by Telegram: a bot never receives its own posts,
+  // so a relayed cast line is invisible to the bot API. Demo harness only.
+  const seedInbox = config.seedAttribution
+    ? new SeedInbox({
+        path: resolve(ROOT, 'var/seed-inbox.jsonl'),
+        router: runtime.router,
+        mirror,
+        groupChatId: config.groupChatId,
+      })
+    : null;
+
   let stopping = false;
   const shutdown = (signal: string): void => {
     if (stopping) return;
@@ -58,6 +70,7 @@ async function main(): Promise<void> {
       .stop()
       .catch((e: unknown) => log.error('shutdown_failed', { detail: e instanceof Error ? e.message : String(e) }))
       .finally(() => {
+        seedInbox?.stop();
         mirror.close();
         process.exit(0);
       });
@@ -66,6 +79,7 @@ async function main(): Promise<void> {
   process.once('SIGINT', () => shutdown('SIGINT'));
 
   await runtime.start();
+  seedInbox?.start();
   log.info('keeper_ready', {
     group: config.groupName,
     chatId: config.groupChatId,

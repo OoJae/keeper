@@ -21,6 +21,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CAST, DAYS, DAY_NOTES, SILENCE_RULES, type SeedMessage } from './cast.js';
+import { appendInbox } from './inbox.js';
 import {
   COMPRESSION,
   describeDay,
@@ -325,18 +326,20 @@ function relayWarning(config: TelegramConfig): string[] {
   return [
     'RELAY MODE — read this once, then decide:',
     '',
-    '  1. Every line below is posted by ONE bot account, not by six people. To the Mind',
-    '     that is one member talking, not six relationships. The per-member memory the',
-    '     whole demo rests on does not get built this way.',
+    '  Every line below is posted by ONE bot account as "@handle: text".',
     '',
-    '  2. Telegram does not deliver messages from one bot to another bot. If Keeper\'s',
-    '     connector is running on a different bot token, it will never see these lines',
-    '     at all — and if it is the same bot, a bot never receives its own messages.',
-    '     Either way the Steward Mind learns nothing from a relayed day.',
+    '  The connector can still attribute those lines to the right cast member, but only',
+    '  with KEEPER_SEED_ATTRIBUTION=true in .env — it then maps each @handle to a stable',
+    '  synthetic member id, so a character stays the same person to the Mind across days.',
+    '  Without that flag the Mind learns NOTHING from a relayed day: Telegram never shows',
+    '  a bot another bot\'s messages, and a bot never receives its own.',
     '',
-    '  So: use this for a scratch group (--to=<id>), for rehearsing pacing, or for',
-    '  filling a group with visual backdrop. For the history the demo is built on,',
-    '  use --script and post from the real cast accounts.',
+    '  What relay cannot do is look like a person on camera. A viewer sees the bot posting',
+    '  "@lena_learns: ...", not Lena. For any beat you actually film — above all Lena\'s',
+    '  return — use --script and post from a real account.',
+    '',
+    '  Good uses: background history the camera never lingers on, a scratch group',
+    '  (--to=<id>), rehearsing pacing.',
     '',
     `  Target chat: ${config.chatId}${config.chatIdIsOverride ? ' (from --to)' : ' (DEMO_GROUP_ID)'}`,
   ];
@@ -402,6 +405,14 @@ async function postDay(day: number, script: SeedMessage[], opts: PaceOptions): P
         messageId: sent.message_id,
         postedAt: new Date().toISOString(),
         relayPrefix: !opts.raw,
+      });
+      appendInbox({
+        handle: CAST[msg.from]?.handle ?? String(msg.from),
+        display: CAST[msg.from]?.display ?? CAST[msg.from]?.handle ?? String(msg.from),
+        text: msg.text,
+        tsMs: sent.date * 1000,
+        chatId: Number(config.chatId),
+        messageId: sent.message_id,
       });
       const at = new Date(sent.date * 1000).toLocaleTimeString();
       process.stdout.write(

@@ -85,6 +85,9 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
   bot.on('message', async (ctx) => {
     const msg = ctx.message;
     const from = msg.from;
+    // Telegram never delivers a bot its own messages, nor one bot another bot's — so a
+    // relayed cast line can never arrive here. Seeded history comes in through
+    // src/seed-inbox.ts instead; see that file's header for why.
     if (from === undefined || from.is_bot) return;
 
     const inGroup = ctx.chat.id === config.groupChatId;

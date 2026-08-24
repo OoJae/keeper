@@ -34,6 +34,13 @@ export interface ConnectorConfig {
   queueMaxPending: number;
   /** Telegram refuses deleteMessage on messages older than this. */
   deleteWindowMs: number;
+  /**
+   * Demo harness only: accept "@handle: text" relayed through our OWN bot in the demo
+   * group and attribute it to that cast member. Without it, seeded history is invisible
+   * to the Mind, because Telegram never shows a bot another bot's messages and we ignore
+   * our own. Default off — it must never be on for a real community.
+   */
+  seedAttribution: boolean;
 }
 
 export class ConnectorConfigError extends Error {
@@ -86,6 +93,11 @@ const FIXES: Record<string, string> = {
     'N routes every Nth otherwise-uninteresting message). Use:  KEEPER_AMBIENT_SAMPLE_RATE=12',
   queueMaxPending:
     'KEEPER_QUEUE_MAX_PENDING must be a positive integer. Use:  KEEPER_QUEUE_MAX_PENDING=20',
+  seedAttribution:
+    "KEEPER_SEED_ATTRIBUTION must be 'true' or 'false'. It lets apps/seeder relay a cast " +
+    "member's line through this bot as \"@handle: text\" when that character has no real " +
+    'Telegram account, so the seeded history still reaches the Mind. Use:  ' +
+    'KEEPER_SEED_ATTRIBUTION=true   (demo harness only — never for a real community)',
   deleteWindowMs:
     'KEEPER_DELETE_WINDOW_MS must be a positive integer. Telegram refuses deleteMessage after ' +
     '48h, so use:  KEEPER_DELETE_WINDOW_MS=172800000',
@@ -109,6 +121,10 @@ const ConfigSchema = z
     ambientSampleRate: z.coerce.number().int().min(0).default(12),
     queueMaxPending: z.coerce.number().int().positive().default(20),
     deleteWindowMs: z.coerce.number().int().positive().default(172_800_000),
+    seedAttribution: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.priorityReserve >= cfg.dailyMindBudget) {
@@ -143,6 +159,7 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('ambientSampleRate', 'KEEPER_AMBIENT_SAMPLE_RATE');
   put('queueMaxPending', 'KEEPER_QUEUE_MAX_PENDING');
   put('deleteWindowMs', 'KEEPER_DELETE_WINDOW_MS');
+  put('seedAttribution', 'KEEPER_SEED_ATTRIBUTION');
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {

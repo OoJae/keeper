@@ -11,7 +11,8 @@
     "spike:memory": "tsx spikes/memory-probe.ts",
     "spike:proactive": "tsx spikes/proactive-probe.ts",
     "spike:circle": "tsx spikes/circle-probe.ts",
-    "spike:wallet": "tsx spikes/wallet-probe.ts"
+    "spike:wallet": "tsx spikes/wallet-probe.ts",
+    "teach:charter": "tsx src/teach-charter.ts"
   },
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",

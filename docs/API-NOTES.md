@@ -187,6 +187,44 @@ funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) app
 
 ---
 
+## COGNITION IS THE BINDING CONSTRAINT (LIVE-VERIFIED 2026-08-24) ⚠️
+
+The free tier ran dry mid-build, and the failure mode is silence: the Mind simply stops
+replying, which every spike correctly reports as `MIND_SILENT` / class MIND rather than a
+platform fault. If the Mind goes quiet, **check credits first**.
+
+Measured on the Steward Mind (`GET /v1/minds/{mindId}/credits`):
+
+| when | credits | creditsStaged | swarm |
+|---|---|---|---|
+| Aug 24, early (after ~1 exchange) | 0 | 185.77 | 172.2 |
+| Aug 24, after a day of building   | 0.073 | 0.195 | 90.6 |
+
+`GET /v1/minds/{mindId}/cognition/usage?interval=1d` over the same period:
+`Aug 22 = 53.94`, `Aug 23 = 23.82`, `Aug 24 = 16.81`.
+
+**Reading of the undocumented shape:** `creditsStaged` behaves as the spendable pool — it
+fell from 185.77 to 0.195 exactly as the Mind went silent. `credits` sits at ~0 throughout
+and is not the balance to watch. This is inference from one Mind over three days, not
+documentation; treat it as the best available reading and re-check before relying on it.
+
+**Rough cost per exchange:** ~0.8-0.9 units. Today's 16.81 covered roughly 20 exchanges
+(spikes, charter attempt, two routed community messages). That makes the free allotment
+worth on the order of 200 exchanges *in total*, not per day — so BUILD_PLAN §7's "≤40
+exchanges/day" budget would exhaust a free Mind in under a week. The connector's daily cap
+protects the demo day; it does not protect the project.
+
+**The Rewards Mind has 0.000 staged** and has never been used. The advertised "+200 on each
+of your first 3 Minds" did not materialise as a usable balance on the second Mind, so do not
+plan around free credits appearing on additional Minds.
+
+**Consequence.** A top-up is not a Phase 5 nicety — without it the Mind cannot be taught its
+charter, cannot answer the connector, and cannot run the demo. It is also what gates the
+wallet: the Mind reported `WALLET_TransferNative` cannot be equipped while "only the free
+tier is active", which is consistent with everything above.
+
+---
+
 ## Live spike results
 
 <!-- Spike scripts append below this line. Do not edit their entries by hand. -->

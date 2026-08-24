@@ -14,7 +14,14 @@ export const EventTypeSchema = z.enum([
 
 export const MemberRefSchema = z.object({
   handle: z.string().min(1),
-  id: z.number().int().positive(),
+  /**
+   * A stable identifier for this member, rendered verbatim into the envelope's `id:`
+   * field. Real Telegram user ids are positive; the demo harness uses NEGATIVE ids for
+   * seeded cast members (apps/connector/src/seed-inbox.ts), which is what keeps a
+   * character the same person to the Mind across days without ever colliding with a real
+   * account. Zero is excluded because it identifies nobody.
+   */
+  id: z.number().int().refine((n) => n !== 0, { message: 'must not be 0' }),
   display: z.string().min(1),
 });
 
