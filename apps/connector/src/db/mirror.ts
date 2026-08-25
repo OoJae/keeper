@@ -108,10 +108,26 @@ export interface ActionRow {
 }
 
 /** Telegram usernames are case-insensitive; store and match them lowercased, without '@'. */
+/**
+ * A directive's `target_member` is written by an LLM, and the live Mind writes it as
+ * `"@dr0pshipper_99 (id:-2384096863)"` — handle AND id, helpfully. Taking that string as a
+ * handle finds nobody, so a correct `delete` became `target_unresolved` and the spam stayed
+ * up (LIVE-OBSERVED 2026-08-26). Keep only the leading handle token.
+ */
 export function normalizeHandle(handle: string | null | undefined): string | null {
   if (typeof handle !== 'string') return null;
-  const trimmed = handle.trim().replace(/^@+/, '').toLowerCase();
+  const first = handle.trim().replace(/^@+/, '').split(/[\s(,;]/)[0] ?? '';
+  const trimmed = first.trim().toLowerCase();
   return trimmed === '' ? null : trimmed;
+}
+
+/** The `id:-123` a directive may carry alongside the handle. Null when absent. */
+export function idFromTarget(target: string | null | undefined): number | null {
+  if (typeof target !== 'string') return null;
+  const m = /\bid:\s*(-?\d{1,19})\b/.exec(target);
+  if (m?.[1] === undefined) return null;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n !== 0 ? n : null;
 }
 
 export class Mirror {

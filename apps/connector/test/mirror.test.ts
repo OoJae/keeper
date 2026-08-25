@@ -120,3 +120,16 @@ describe('settings', () => {
     expect(mirror.getSetting('nope')).toBeUndefined();
   });
 });
+
+describe('target_member as the live Mind writes it', () => {
+  it('finds the member when the handle carries an id in parentheses', () => {
+    // LIVE-OBSERVED 2026-08-26: the Mind writes "@dr0pshipper_99 (id:-2384096863)". Taking
+    // that whole string as a handle found nobody, so a correct `delete` was downgraded to
+    // target_unresolved and the spam stayed up in the group.
+    const m = Mirror.open(':memory:');
+    m.touchMember({ telegramId: -2384096863, handle: 'dr0pshipper_99', display: 'drop', tsMs: 1, spoke: true });
+    expect(m.findMemberByHandle('@dr0pshipper_99 (id:-2384096863)')?.telegramId).toBe(-2384096863);
+    expect(m.findMemberByHandle('@dr0pshipper_99')?.telegramId).toBe(-2384096863);
+    m.close();
+  });
+});
