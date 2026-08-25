@@ -184,6 +184,21 @@ export class Mirror {
           lastSeenMs: input.spoke ? input.tsMs : null,
           messageCount: input.spoke ? 1 : 0,
         })
+        // The read said this member was new, so a conflict here means a row appeared
+        // between the two statements — a re-entrant ingest, a redelivered update. Merging
+        // is always right (earliest first_seen, latest last_seen) and a crash never is:
+        // an unhandled SqliteError here takes the whole connector down mid-community, which
+        // is exactly what happened on 2026-08-25 while seeding day 3.
+        .onConflictDoUpdate({
+          target: members.telegramId,
+          set: {
+            handle: sql`coalesce(excluded.handle, ${members.handle})`,
+            display: sql`excluded.display`,
+            firstSeenMs: sql`min(${members.firstSeenMs}, excluded.first_seen_ms)`,
+            lastSeenMs: sql`max(coalesce(${members.lastSeenMs}, 0), coalesce(excluded.last_seen_ms, 0))`,
+            messageCount: sql`${members.messageCount} + excluded.message_count`,
+          },
+        })
         .run();
     } else {
       this.db

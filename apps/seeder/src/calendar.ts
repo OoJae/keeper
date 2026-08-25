@@ -38,22 +38,40 @@ export const SUBMISSION_DAY = 4;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Noon local time, so day arithmetic can never be knocked over by a DST edge. */
-function localNoon(year: number, month: number, day: number): Date {
-  return new Date(year, month - 1, day, 12, 0, 0, 0);
+/**
+ * Days are reckoned in the COMMUNITY's timezone, not the machine's.
+ *
+ * "Ada's Editing Lab" is in Hong Kong (+08:00), the connector already bins its day
+ * boundaries there (KEEPER_UTC_OFFSET_MINUTES), and the submission deadline is HKT. The
+ * seeder used to use the machine's local timezone instead, so on a laptop in WAT (+01:00)
+ * it insisted it was still day 2 while the connector had already rolled over to day 3 —
+ * seven hours where the two halves disagreed about what day the community was living in.
+ *
+ * Same env var as the connector, same default, so they cannot drift apart again.
+ */
+const OFFSET_MINUTES = (() => {
+  const raw = Number(process.env['KEEPER_UTC_OFFSET_MINUTES']);
+  return Number.isFinite(raw) && raw >= -840 && raw <= 840 ? raw : 480;
+})();
+
+/** Midday in the community's frame, so DST edges cannot knock the arithmetic over. */
+function communityNoon(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0) - OFFSET_MINUTES * 60_000);
 }
 
-const DAY_ONE_DATE = localNoon(DAY_ONE.year, DAY_ONE.month, DAY_ONE.day);
+const DAY_ONE_DATE = communityNoon(DAY_ONE.year, DAY_ONE.month, DAY_ONE.day);
 
 /** The real date sprint day `n` falls on. */
 export function dateForDay(n: number): Date {
   return new Date(DAY_ONE_DATE.getTime() + (n - 1) * MS_PER_DAY);
 }
 
-/** Which sprint day a real date is. Day 1 = 2026-08-20; can return <1 or >8. */
+/** Which sprint day a real instant falls in, in the community's frame. */
 export function dayForDate(date: Date = new Date()): number {
-  const noon = localNoon(date.getFullYear(), date.getMonth() + 1, date.getDate());
-  return Math.round((noon.getTime() - DAY_ONE_DATE.getTime()) / MS_PER_DAY) + 1;
+  const shifted = date.getTime() + OFFSET_MINUTES * 60_000;
+  const dayStart = Math.floor(shifted / MS_PER_DAY) * MS_PER_DAY - OFFSET_MINUTES * 60_000;
+  const noon = dayStart + 12 * 60 * 60 * 1000;
+  return Math.round((noon - DAY_ONE_DATE.getTime()) / MS_PER_DAY) + 1;
 }
 
 /** Today's sprint day. */
