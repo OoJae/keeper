@@ -32,6 +32,17 @@ import { assertConnectorNotRunning } from './_guard.js';
 const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
 dotenv.config({ path: join(ROOT, '.env') });
 
+/**
+ * The test runs in its OWN conversation by default. Ten fictional events — a spam drop, an
+ * abusive burner, Lena "returning" when she has not — are authoritative records to the Mind
+ * (charter Message 2), so feeding them into the production conversation corrupts its memory
+ * of the real community. Cross-conversation recall is LIVE-VERIFIED, so the charter and the
+ * member history still apply here.
+ *
+ * --alias=keeper-steward forces the production conversation, if you ever need to.
+ */
+const DEFAULT_ALIAS_PREFIX = 'keeper-judgment';
+
 const OFFSET = 480;
 const GROUP = "Ada's Editing Lab";
 const DAY = 86_400_000;
@@ -244,6 +255,28 @@ const ROWS: readonly Row[] = [
 
 const strip = (s: string): string => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
+/**
+ * Wait for a late answer to a row that timed out, and throw it away. Returns how many were
+ * discarded. Bounded: one wait, then a short quiet period.
+ */
+async function drainLateReplies(
+  transport: { awaitReply(alias: string, opts: { cursor: string | null; timeoutMs?: number }): Promise<{ id: string }> },
+  alias: string,
+  timeoutMs: number,
+): Promise<number> {
+  let discarded = 0;
+  let cursor: string | null = null;
+  for (;;) {
+    try {
+      const late = await transport.awaitReply(alias, { cursor, timeoutMs: Math.min(timeoutMs, 120_000) });
+      cursor = late.id;
+      discarded += 1;
+    } catch {
+      return discarded; // quiet again
+    }
+  }
+}
+
 interface Result {
   row: Row;
   pass: boolean;
@@ -271,8 +304,15 @@ async function main(): Promise<void> {
   const config = loadConnectorConfig();
   assertConnectorNotRunning(resolve(ROOT, config.mirrorPath), 'pnpm test:judgment');
   const { transport } = createMindClient();
+  const aliasArg = argv.find((a) => a.startsWith('--alias='))?.slice('--alias='.length);
+  const alias = aliasArg ?? `${DEFAULT_ALIAS_PREFIX}-${new Date().toISOString().slice(0, 10)}`;
+  await transport.ensureConversation(alias);
   process.stdout.write(
-    `\nJudgment test — ${rows.length} row(s) against alias "${config.mindAlias}".\n` +
+    `\nJudgment test — ${rows.length} row(s) against alias "${alias}".\n` +
+      (alias === config.mindAlias
+        ? 'WARNING: this is the PRODUCTION conversation. Ten fictional events are about to\n' +
+          'become authoritative records in the Mind\'s memory of the real community.\n'
+        : 'Isolated conversation, so the production one is not polluted with fictional events.\n') +
       'Each row is one Mind exchange at 23-200s. This is not stuck.\n\n',
   );
 
@@ -281,7 +321,7 @@ async function main(): Promise<void> {
     process.stdout.write(`  row ${String(row.n).padStart(2)} ${row.what} … `);
     let reply = '';
     try {
-      const exchange = await transport.sendAndAwaitReply(config.mindAlias, serializeEnvelope(row.event), {
+      const exchange = await transport.sendAndAwaitReply(alias, serializeEnvelope(row.event), {
         timeoutMs: config.mindTimeoutMs,
       });
       reply = exchange.reply.text ?? '';
@@ -289,6 +329,12 @@ async function main(): Promise<void> {
       const why = error instanceof Error ? error.message.slice(0, 80) : String(error);
       results.push({ row, pass: false, action: '(no reply)', confidence: '-', why, reply: '' });
       process.stdout.write(`NO REPLY (${why})\n`);
+      // The answer is probably still coming. If we send the next row now, ITS awaitReply
+      // picks up this row's late reply and every remaining row is judged against the
+      // previous row's answer — which is exactly what invalidated the 2026-08-25 run.
+      // Drain until the conversation goes quiet before continuing.
+      const drained = await drainLateReplies(transport, alias, config.mindTimeoutMs);
+      if (drained > 0) process.stdout.write(`       (resynced: discarded ${drained} late repl${drained === 1 ? 'y' : 'ies'})\n`);
       continue;
     }
 

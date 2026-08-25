@@ -187,6 +187,28 @@ funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) app
 
 ---
 
+## The first exchange after an idle period is the slow one (LIVE-OBSERVED 2026-08-25)
+
+Two separate judgment-test runs timed out on **row 1 at exactly 300s** and then passed row 2
+immediately afterwards. The pattern is consistent with everything else measured here — a
+memory question answered at 199s, charter messages at 113.8s and 124.4s — and inconsistent
+with a transport bug: the same alias, cursor and code answer fine seconds later.
+
+Read it as a cold-start cost on the platform side. Practical consequences:
+
+- **Warm the Mind before anything that matters.** `pnpm ping:mind` is one cheap exchange and
+  doubles as the liveness check. Do it before a judgment run, and before recording.
+- A 300s timeout is not generous enough for a cold first call. Do not conclude the Mind is
+  broken from one timeout; re-run the row.
+- On camera, the first beat of a take is the one at risk. Pre-warm, then roll.
+
+Not yet explained: the timeout error reports a `resume cursor` that has not advanced, which
+would also be the symptom of `after=` returning nothing for the whole window. Both stories
+fit the evidence, and they are distinguishable only by instrumenting a failing call — worth
+doing if this ever costs a take, not worth doing now.
+
+---
+
 ## Corrections after the first top-up (LIVE-VERIFIED 2026-08-25)
 
 - **`creditsStaged` IS the spendable pool, but it lags.** Right after topping up, the

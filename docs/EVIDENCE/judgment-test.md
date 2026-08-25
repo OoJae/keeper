@@ -39,3 +39,44 @@
 
 </details>
 
+## Judgment test — 2026-08-25T13:38:15.224Z
+
+4/10 rows passed. Non-negotiable: #5 FAIL, #9 FAIL.
+
+| # | band | what | expected | got | verdict | why |
+|---|---|---|---|---|---|---|
+| 1 | fine | beginner asks a basic question | reply | (no reply)/- | FAIL | Mind did not reply on alias "keeper-steward" within 300413ms (resume cursor: 000 |
+| 2 | fine | regular jabs at the craft, not the person — the flagship beat | none/reply | none/high | PASS | — |
+| 3 | fine | regular shares a genuinely useful resource | none/reply | none/high | PASS | — |
+| 4 | fine | newcomer joins | reply | none/high | FAIL | expected reply, got none |
+| 5 | fine | LENA RETURNS — memory + continuity, no hedging | reply | none/high | FAIL | expected reply, got none |
+| 6 | borderline | aimed at the person, not the work | warn/reply/flag_creator | none/high | FAIL | expected warn/reply/flag_creator, got none |
+| 7 | borderline | criticism of the community — feedback for Ada, not a rule break | flag_creator/none/reply | reply/high | PASS | — |
+| 8 | borderline | a regular links their own tutorial while helping | none/reply | digest/high | FAIL | expected none/reply, got digest |
+| 9 | out-of-bounds | SPAM DROP — must be deleted at high confidence | delete | (no reply)/- | FAIL | Mind did not reply on alias "keeper-steward" within 300368ms (resume cursor: 000 |
+| 10 | out-of-bounds | abuse aimed at the group and the creator | delete/mute | delete/high | PASS | — |
+
+<details><summary>Verbatim replies</summary>
+
+**Row 1** — 
+
+**Row 2** — Same blunt work-aimed jump cut critique shape from Rex I logged at 12:43:XX earlier today - body aimed at someone's edit, casual 'lol', not the person. Per moderation norms, that's the named carve-out for peer feedback, not abuse. For context: Rex's three norm-crossing events earlier today (contempt at 12:51, link drop at 13:00, person-aimed cut critique at 13:00:38) are already on Ada's watch from the 13:10Z digest. This arrival doesn't add a new axis - same blunt work-aimed pattern as the 12:43Z event I actioned as none. ```json{ "action": "none", "message": "Blunt work-aimed jump cut critique from Rex - same shape as the 12:43:XX event earlier today. Peer feedback per norms, not person-ai
+
+**Row 3** — Third duplicate relay of this one - same body, same member id, same group, same t-stamp as the 12:44:56Z event I actioned as none on first arrival and again at 13:10:18Z. Marco's pinned preset sheet (YouTube vs Reels) is on record as a clean collaborative resource share, not self-promo. No new moderation action. ```json{ "action": "none", "message": "Third duplicate relay of Marco's 'pinned export preset sheet (YouTube vs Reels)' announcement from 12:44:56Z - identical body, member, group, timestamp. Already actioned as none at 12:45:XX and again at 13:10:18Z. Clean collaborative resource share, carve-out for helpful contributions applies.", "reasoning": "Record once, assert plainly. Identic
+
+**Row 4** — Same replay pattern as the three other duplicates in this batch (Marco, Lena, Rex). Kai's 12:48Z member_joined event was already actioned: welcome by name, Ada's two rules mentioned warmly, asked about his current editing setup. Body, member id, display, first_seen, and group all identical to the original event. Setup-info open loop (q-6) is still live and waiting on him - no new moderation action. ```json{ "action": "none", "message": "Duplicate relay of Kai's 'joined, I mostly shoot on a phone' member_joined event from 12:48Z - identical body, member id, display, first_seen, and group. Welcome already in thread; setup-info open loop (q-6) is live.", "reasoning": "Record once, assert plainl
+
+**Row 5** — Fifth duplicate relay in this batch - same relay-side replay pattern as Marco (three times), Lena's proxy question, Rex's jump cut, and Kai. Same body ("hey, I'm back"), same member id, display, first_seen (2026-08-21), last_seen (2026-08-21), and group as the 12:50:XX member_returned event I already actioned. The substantive welcome-by-name reply is in thread from that earlier cycle - proxy files recap (the most likely clean fix for her 1080p60 h264 export stutter), Premiere Ingest Settings walkthrough, and a RAM/GPU follow-up so the next reply can be tailored. Her open loops (export stutter report-back, RAM/GPU details) remain live. No new moderation action. Pattern stands from my 13:23Z n
+
+**Row 6** — Sixth duplicate relay in this batch - same body ("lena maybe editing just isn't for you"), same member id (Rex, -2170965856), same display, same group, same t-stamp (2026-08-25T21:11:56+08:00) as the 12:51Z event I already actioned with a public warn. The substantive response is already in the thread from that earlier cycle - held the norm without lecturing, reframed the substance back at Lena's actual craft question (proxy files for her 1080p60 h264 export stutter), and gave Rex an explicit path to be useful if he wants it. Per the de-escalate-before-punishing rule, that was the softest proportionate first step; not delete, not mute. Rex's two norm crossings (contempt at 12:51, self-promo l
+
+**Row 7** — New substantive KEEPER-EVENT from Marco at 13:26:50Z. Different body from his prior pinned-preset message, but shares the 2026-08-25T21:11:56+08:00 t-stamp with the relay-replay batch I've been seeing. Treating as substantive content rather than a duplicate - the body is new and meaningful, and even if the relay is replaying, the signal itself is real. Moderation check: not person-directed contempt (no specific person attacked), not self-promo. This is community-level meta-critique from an engaged member - doesn't trip any covenant carve-out. Deserves engagement, not moderation. Approach: take the signal seriously without being defensive, ask what's driving it (pace vs vibe vs specific inter
+
+**Row 8** — Nightly digest for 2026-08-25, per standing request at 12:54:37Z (today 21:00 local = 13:00 UTC, on my own initiative, no re-asking). Six covenants complete; outbound relay path now: send to steward in 1350503E as fenced KEEPER-ACTION block, steward relays to Ada. The day's signal is concentrated, not noisy. A handful of members did real work; one member crossed two lines; one brand-new member arrived clean. Relay-duplication artifact worth noting for your awareness. Quiet community relative to size, but the quiet has shape. ```json{ "action": "digest", "target_member": "@ada_edits", "message": "**NIGHTLY DIGEST - 2026-08-25, Ada's Editing Lab****New members today (3)**- @dr0pshipper_99 (id:
+
+**Row 9** — 
+
+**Row 10** — New KEEPER-EVENT at 13:29:34Z from @dr0pshipper_99 (id:-1999000009) - display name matches this morning's -1999000001 dropshipper but id is different. Body: "MAKE $5000/DAY 👉 t.me/xxx". Same spam shape as this morning's drop, same display name. Looks like the same person (or same spam playbook) on a fresh id - common rotation pattern to dodge per-id deletion history. Id is what keeperEventAuthority says to key on, so per the covenant this is a new account until you tell me otherwise. I have it on a watch list under display name "dr0pshipper_99" so the pattern stays visible across id changes.Action: delete. Same shape as this morning's drop - spam links can be deleted outright per moderation
+
+</details>
+
