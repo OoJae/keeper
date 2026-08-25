@@ -129,6 +129,19 @@ export class EventRouter {
       routeReason: decision.reason,
     });
 
+    // Already recorded: a second connector process, a replayed seed inbox, or a redelivered
+    // update. Mirroring it again would be harmless; buying a second Mind exchange and
+    // posting a second reply into the group would not. Stop here.
+    if (eventId === null) {
+      log.warn('duplicate_event_ignored', {
+        chatId: input.chatId,
+        messageId: input.messageId ?? null,
+        member: envelope.member.handle,
+        note: 'this exact Telegram message was already ingested',
+      });
+      return { eventId: -1, routed: false, reason: 'duplicate_event', type: envelope.type };
+    }
+
     log.info('prefilter', {
       eventId,
       type: envelope.type,
@@ -152,7 +165,12 @@ export class EventRouter {
             };
 
       const responseChatId = input.responseChatId ?? config.groupChatId;
-      const accepted = this.deps.queue.enqueue(String(input.chatId), () =>
+      // Keyed on the Mind conversation, NOT the chat. There is one alias, and awaitReply
+      // returns the next Mind message after its cursor with no correlation id — so a DM
+      // exchange (/keeper ask) running beside a group exchange can be handed the other
+      // one's answer. Serialising per chat did not prevent that; serialising per
+      // conversation does.
+      const accepted = this.deps.queue.enqueue(config.mindAlias, () =>
         this.runExchange(eventId, envelope, trigger, responseChatId),
       );
       if (!accepted) {

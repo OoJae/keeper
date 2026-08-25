@@ -183,7 +183,12 @@ export class Mirror {
 
   // --- events --------------------------------------------------------------
 
-  recordEvent(input: RecordEventInput): number {
+  /**
+   * Returns the new event id, or `null` when this exact Telegram message has already been
+   * recorded (see events_message_uniq). Callers must treat null as "already handled" and
+   * do nothing further — that is what stops a duplicate reply reaching the group.
+   */
+  recordEvent(input: RecordEventInput): number | null {
     const result = this.db
       .insert(events)
       .values({
@@ -196,8 +201,10 @@ export class Mirror {
         routed: input.routed ? 1 : 0,
         routeReason: input.routeReason,
       })
+      .onConflictDoNothing()
       .run();
-    return Number(result.lastInsertRowid);
+    // better-sqlite3 reports 0 changes when the unique index swallowed the insert.
+    return result.changes === 0 ? null : Number(result.lastInsertRowid);
   }
 
   /** Mind exchanges actually spent in [fromMs, toMs). Survives a restart, unlike a counter. */

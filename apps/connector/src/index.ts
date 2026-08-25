@@ -16,6 +16,7 @@ import { MindsConfigError, createMindClient } from '@keeper/minds-client';
 import { ConnectorConfigError, loadConnectorConfig } from './config.js';
 import { Mirror } from './db/mirror.js';
 import { SeedInbox } from './seed-inbox.js';
+import { AlreadyRunningError, acquireSingleInstanceLock } from './single-instance.js';
 import { log } from './log.js';
 import { SequentialQueue } from './pipeline/queue.js';
 import { createConnector } from './telegram/bot.js';
@@ -37,6 +38,8 @@ dotenv.config({ path: join(ROOT, '.env') });
 async function main(): Promise<void> {
   const config = loadConnectorConfig();
   const mirrorPath = resolve(ROOT, config.mirrorPath);
+  // Before anything opens a socket: two connectors would double every reply.
+  const releaseLock = acquireSingleInstanceLock(`${mirrorPath}.lock`);
   const mirror = Mirror.open(mirrorPath);
   log.info('mirror_ready', { path: mirrorPath, members: mirror.listMembers().length });
 
@@ -72,6 +75,7 @@ async function main(): Promise<void> {
       .finally(() => {
         seedInbox?.stop();
         mirror.close();
+        releaseLock();
         process.exit(0);
       });
   };
@@ -89,6 +93,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
+  if (error instanceof AlreadyRunningError) {
+    log.banner('KEEPER IS ALREADY RUNNING', [error.message]);
+    process.exit(2);
+  }
   if (error instanceof ConnectorConfigError || error instanceof MindsConfigError) {
     log.banner('KEEPER CANNOT START — CONFIGURATION IS INCOMPLETE', [
       error.message,

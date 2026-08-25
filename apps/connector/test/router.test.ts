@@ -307,4 +307,30 @@ describe('creator commands', () => {
   it('ignores anything that is not a /keeper command', async () => {
     expect(await command('just chatting')).toBe(false);
   });
+
+  it('ingests one Telegram message exactly once, however many times it arrives', async () => {
+    // Two connector processes, a replayed seed inbox, or a redelivered update. Each extra
+    // row would buy its own Mind exchange and post its own reply — Keeper answering the
+    // same question twice in the group, which happened for real on 2026-08-25.
+    build(FENCED_REPLY);
+    const message = {
+      kind: 'message' as const,
+      member: { telegramId: 555, handle: 'rex_hotkeys', display: 'Rex' },
+      text: 'why are my titles soft after export?',
+      chatId: GROUP,
+      messageId: 4242,
+      tsMs: NOW,
+    };
+
+    const first = router.ingest(message);
+    const second = router.ingest(message);
+    await queue.drain();
+
+    expect(first.routed).toBe(true);
+    expect(second.routed).toBe(false);
+    expect(second.reason).toBe('duplicate_event');
+    // The thing that actually matters: one reply, not two.
+    expect(surface.groupMessages).toHaveLength(1);
+    expect(transport.sentEnvelopes).toHaveLength(1);
+  });
 });

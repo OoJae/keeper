@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_ts_idx     ON events (ts_ms);
 CREATE INDEX IF NOT EXISTS events_routed_idx ON events (routed, ts_ms);
+-- One Telegram message is one event, forever. Two connector processes, a replayed seed
+-- inbox, or a redelivered update would otherwise each mint their own row — and each row
+-- buys its own Mind exchange and its own reply, so Keeper answers the same message twice
+-- in the group. That happened once (2026-08-25) and it is unacceptable on camera, so the
+-- guarantee lives in the schema rather than in everyone remembering to be careful.
+-- Partial: rows without a message_id (joins, scheduled digests) are exempt.
+CREATE UNIQUE INDEX IF NOT EXISTS events_message_uniq
+  ON events (chat_id, message_id) WHERE message_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS actions (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
