@@ -11,6 +11,30 @@ import { dirname, resolve as resolvePath } from 'node:path';
 
 import { BOOTSTRAP_DDL, actions, events, memberAliases, members, settings } from './schema.js';
 
+/**
+ * Columns added after a mirror already existed.
+ *
+ * BOOTSTRAP_DDL is all `CREATE TABLE IF NOT EXISTS`, which does nothing to a table that is
+ * already there — so a new column never reached a running deployment, and the connector
+ * crashed on "table actions has no column named overridden_at_ms" mid-community. Dropping
+ * the mirror is not an option: it holds the real history the demo is built on.
+ *
+ * Idempotent and additive only. SQLite has no ADD COLUMN IF NOT EXISTS, so each is checked
+ * against pragma table_info first.
+ */
+const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; ddl: string }> = [
+  { table: 'actions', column: 'overridden_at_ms', ddl: 'ALTER TABLE actions ADD COLUMN overridden_at_ms INTEGER' },
+];
+
+function migrate(sqlite: Database.Database): void {
+  for (const { table, column, ddl } of ADDED_COLUMNS) {
+    const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (cols.length === 0) continue; // table not created yet; BOOTSTRAP_DDL owns it
+    if (cols.some((c) => c.name === column)) continue;
+    sqlite.exec(ddl);
+  }
+}
+
 export interface AliasRow {
   readonly aliasTelegramId: number;
   readonly canonicalTelegramId: number;
@@ -150,6 +174,7 @@ export class Mirror {
     sqlite.pragma('journal_mode = WAL');
     sqlite.pragma('foreign_keys = ON');
     sqlite.exec(BOOTSTRAP_DDL);
+    migrate(sqlite);
     return new Mirror(sqlite);
   }
 

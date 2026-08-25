@@ -1,3 +1,8 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { Mirror } from '../src/db/mirror.js';
@@ -39,5 +44,38 @@ describe('touchMember survives a row appearing between read and write', () => {
     // real message would never classify as member_returned.
     expect(row?.lastSeenMs).toBeNull();
     expect(row?.messageCount).toBe(0);
+  });
+});
+
+describe('a mirror that predates a schema change', () => {
+  it('gains the new column instead of crashing the connector', () => {
+    // BOOTSTRAP_DDL is all CREATE TABLE IF NOT EXISTS, so a column added later never reached
+    // an existing database: the connector died on "table actions has no column named
+    // overridden_at_ms" mid-community. Dropping the mirror is not an option — it holds the
+    // real multi-day history the demo rests on.
+    const dir = mkdtempSync(join(tmpdir(), 'keeper-mig-'));
+    const path = join(dir, 'keeper.db');
+
+    // An "old" mirror: the actions table without the newer column.
+    const old = new Database(path);
+    old.exec(`CREATE TABLE actions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER, action TEXT NOT NULL,
+      original_action TEXT NOT NULL, target_handle TEXT, target_telegram_id INTEGER,
+      message TEXT, reasoning TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'low',
+      gated INTEGER NOT NULL DEFAULT 0, converted TEXT, warnings TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', overridden INTEGER NOT NULL DEFAULT 0,
+      override_note TEXT, posted_chat_id INTEGER, posted_message_id INTEGER,
+      undo_json TEXT, raw_reply TEXT NOT NULL DEFAULT '', ts_ms INTEGER NOT NULL)`);
+    old.close();
+
+    const m = Mirror.open(path);
+    const id = m.recordAction({
+      eventId: null, action: 'reply', originalAction: 'reply', reasoning: 'r',
+      confidence: 'high', gated: false, warnings: [], status: 'executed', detail: 'd',
+      rawReply: '', tsMs: 1,
+    });
+    expect(() => m.markOverridden(id, 'undo by creator', 2)).not.toThrow();
+    expect(m.listActions(1)[0]?.overriddenAtMs).toBe(2);
+    m.close();
   });
 });
