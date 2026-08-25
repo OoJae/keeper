@@ -4,7 +4,7 @@
  * file. See db/schema.ts for the iron rule this obeys.
  */
 import Database from 'better-sqlite3';
-import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, like, lt, sql } from 'drizzle-orm';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
@@ -495,6 +495,23 @@ export class Mirror {
       .values({ key, value, updatedAtMs: tsMs })
       .onConflictDoUpdate({ target: settings.key, set: { value, updatedAtMs: tsMs } })
       .run();
+  }
+
+  /**
+   * Every setting whose key starts with `prefix`. Used to find outstanding day-2 check-ins
+   * without a table of their own: one row per member who is owed one, deleted when paid.
+   */
+  listSettings(prefix: string): Array<{ key: string; value: string }> {
+    return this.db
+      .select()
+      .from(settings)
+      .where(like(settings.key, `${prefix}%`))
+      .all()
+      .map((r) => ({ key: r.key, value: r.value }));
+  }
+
+  deleteSetting(key: string): void {
+    this.db.delete(settings).where(eq(settings.key, key)).run();
   }
 
   isPaused(): boolean {

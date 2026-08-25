@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev:connector": "pnpm --filter @keeper/connector dev",
-    "dev:dashboard": "pnpm --filter @keeper/dashboard dev",
+    "dev:dashboard": "echo 'apps/dashboard is Phase 6 and does not exist yet' && exit 1",
     "seed:day": "pnpm --filter @keeper/seeder seed:day",
     "demo:run": "pnpm --filter @keeper/seeder demo:run",
     "test": "vitest run",

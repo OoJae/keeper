@@ -141,6 +141,7 @@ export function testConfig(overrides: Partial<ConnectorConfig> = {}): ConnectorC
     digestAtMinutes: 21 * 60,
     digestArmLeadMs: 3 * 60 * 60 * 1000,
     digestCutoffMs: 60 * 60 * 1000,
+    checkinAtMinutes: 10 * 60,
     mindAlias: 'keeper-steward-test',
     mindTimeoutMs: 1000,
     utcOffsetMinutes: 480,

@@ -49,6 +49,13 @@ export interface RouterDeps {
    * for the next poll. Optional so existing tests construct a router without one.
    */
   watcher?: { sweep(opts?: { skipFingerprint?: string }): Promise<unknown> };
+  /**
+   * Optional: records that a welcomed newcomer is owed a day-2 check-in. Only a successful
+   * welcome creates the debt — if the Mind said nothing, there is nothing to follow up on.
+   */
+  checkins?: {
+    markDue(input: { memberId: number; handle: string | null; display: string; tsMs: number }): void;
+  };
   mirror: Mirror;
   surface: TelegramSurface;
   transport: MindTransport;
@@ -217,6 +224,11 @@ export class EventRouter {
     return { eventId, routed: decision.route, reason: decision.reason, type: envelope.type };
   }
 
+  /** Wired after construction: the scheduler needs the router, and the router needs it. */
+  attachCheckins(checkins: NonNullable<RouterDeps['checkins']>): void {
+    this.deps.checkins = checkins;
+  }
+
   /** One Mind exchange plus its directive execution. Never throws: it logs and records. */
   private async runExchange(
     eventId: number,
@@ -292,6 +304,20 @@ export class EventRouter {
       } catch (e) {
         log.warn('mind_watch_sweep_failed', { detail: e instanceof Error ? e.message : String(e) });
       }
+    }
+
+    // A welcome that actually posted is what makes a check-in owed tomorrow.
+    if (
+      envelope.type === 'member_joined' &&
+      outcome.status === 'executed' &&
+      this.deps.checkins !== undefined
+    ) {
+      this.deps.checkins.markDue({
+        memberId: envelope.member.id,
+        handle: envelope.member.handle,
+        display: envelope.member.display,
+        tsMs: this.now(),
+      });
     }
 
     const actionId = mirror.recordAction({

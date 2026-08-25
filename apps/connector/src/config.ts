@@ -58,6 +58,11 @@ export interface ConnectorConfig {
   digestArmLeadMs: number;
   /** How long past the hour to wait before the connector asks explicitly. */
   digestCutoffMs: number;
+  /**
+   * Minutes after local midnight from which a day-2 check-in may be armed. -1 disables.
+   * Not a send time: the Mind still chooses the moment and the words.
+   */
+  checkinAtMinutes: number;
 }
 
 export class ConnectorConfigError extends Error {
@@ -110,6 +115,10 @@ const FIXES: Record<string, string> = {
     'N routes every Nth otherwise-uninteresting message). Use:  KEEPER_AMBIENT_SAMPLE_RATE=12',
   queueMaxPending:
     'KEEPER_QUEUE_MAX_PENDING must be a positive integer. Use:  KEEPER_QUEUE_MAX_PENDING=20',
+  checkinAtMinutes:
+    'KEEPER_CHECKIN_AT_MINUTES is minutes after local midnight from which a newcomer\'s ' +
+    'day-2 check-in may be armed (-1 disables). 10:00 is 600. Use:  ' +
+    'KEEPER_CHECKIN_AT_MINUTES=600',
   digestAtMinutes:
     'KEEPER_DIGEST_AT_MINUTES is minutes after local midnight for the nightly digest ' +
     '(-1 disables). 21:00 is 1260. Use:  KEEPER_DIGEST_AT_MINUTES=1260',
@@ -164,6 +173,7 @@ const ConfigSchema = z
     digestAtMinutes: z.coerce.number().int().min(-1).max(1439).default(21 * 60),
     digestArmLeadMs: z.coerce.number().int().nonnegative().default(3 * 60 * 60 * 1000),
     digestCutoffMs: z.coerce.number().int().nonnegative().default(60 * 60 * 1000),
+    checkinAtMinutes: z.coerce.number().int().min(-1).max(1439).default(10 * 60),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.priorityReserve >= cfg.dailyMindBudget) {
@@ -204,6 +214,7 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('digestAtMinutes', 'KEEPER_DIGEST_AT_MINUTES');
   put('digestArmLeadMs', 'KEEPER_DIGEST_ARM_LEAD_MS');
   put('digestCutoffMs', 'KEEPER_DIGEST_CUTOFF_MS');
+  put('checkinAtMinutes', 'KEEPER_CHECKIN_AT_MINUTES');
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {

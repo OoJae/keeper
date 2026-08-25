@@ -89,7 +89,11 @@ async function main(): Promise<void> {
   runtime.watcher.start();
   // One timer drives both: the watcher polls for what the Mind sent on its own, and the
   // digest scheduler decides whether tonight still needs arming or backstopping.
-  const digestTimer = setInterval(() => runtime.digest.tick(), 60_000);
+  const digestTimer = setInterval(() => {
+    runtime.digest.tick();
+  runtime.checkins.tick();
+    runtime.checkins.tick();
+  }, 60_000);
   digestTimer.unref?.();
   runtime.digest.tick();
   log.info('keeper_ready', {

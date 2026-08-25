@@ -16,6 +16,7 @@ import { handleCreatorCommand, isKeeperCommand } from '../commands.js';
 import type { ConnectorConfig } from '../config.js';
 import type { Mirror } from '../db/mirror.js';
 import { log } from '../log.js';
+import { CheckinScheduler } from '../pipeline/checkin.js';
 import { DigestScheduler } from '../pipeline/digest.js';
 import { MindWatcher } from '../pipeline/mind-watch.js';
 import { EventRouter } from '../pipeline/router.js';
@@ -46,6 +47,8 @@ export interface ConnectorRuntime {
   watcher: MindWatcher;
   /** Arms the Mind's own nightly digest, and backstops it. */
   digest: DigestScheduler;
+  /** Remembers that a welcomed newcomer is owed a day-2 check-in. */
+  checkins: CheckinScheduler;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -66,6 +69,8 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
   const watcher = new MindWatcher({ transport, mirror, surface, queue, config });
   const router = new EventRouter({ mirror, surface, transport, queue, config, watcher });
   const digest = new DigestScheduler({ mirror, router, transport, queue, config });
+  const checkins = new CheckinScheduler({ mirror, surface, transport, queue, config });
+  router.attachCheckins(checkins);
   watcher.onDigestDelivered = (tsMs) => digest.markDelivered(tsMs, 'mind');
 
   const memberOf = (user: User): { telegramId: number; handle: string | null; display: string } => ({
@@ -184,6 +189,7 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
     router,
     watcher,
     digest,
+    checkins,
 
     async start(): Promise<void> {
       await new Promise<void>((resolve, reject) => {
