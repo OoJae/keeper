@@ -16,7 +16,8 @@
     "ping:mind": "tsx src/tools/ping-mind.ts",
     "probe:memory": "tsx src/tools/probe-memory.ts",
     "link:member": "tsx src/tools/link-member.ts",
-    "test:judgment": "tsx src/tools/judgment-test.ts"
+    "test:judgment": "tsx src/tools/judgment-test.ts",
+    "evidence:capture": "tsx src/tools/capture-evidence.ts"
   },
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",

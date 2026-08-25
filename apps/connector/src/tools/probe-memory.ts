@@ -13,10 +13,14 @@ import { createMindClient } from '@keeper/minds-client';
 import { extractDirective, serializeEnvelope } from '@keeper/protocol';
 import dotenv from 'dotenv';
 
+import { assertConnectorNotRunning } from './_guard.js';
+
 const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
 dotenv.config({ path: join(ROOT, '.env') });
 
 const alias = process.env['KEEPER_MIND_ALIAS'] ?? 'keeper-steward';
+assertConnectorNotRunning(join(ROOT, 'var', 'keeper.db'), 'pnpm probe:memory');
+
 const { transport } = createMindClient();
 const strip = (s: string): string => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 

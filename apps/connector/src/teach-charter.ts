@@ -23,6 +23,7 @@ import { createMindClient } from '@keeper/minds-client';
 import dotenv from 'dotenv';
 
 import { loadConnectorConfig, ConnectorConfigError } from './config.js';
+import { assertConnectorNotRunning } from './tools/_guard.js';
 import { Mirror } from './db/mirror.js';
 import { log } from './log.js';
 
@@ -85,6 +86,7 @@ async function main(): Promise<void> {
   }
 
   const config = loadConnectorConfig();
+  assertConnectorNotRunning(resolve(ROOT, config.mirrorPath), 'pnpm teach:charter');
   const mirror = Mirror.open(resolve(ROOT, config.mirrorPath));
   const { transport } = createMindClient();
 

@@ -27,6 +27,7 @@ import { extractDirective, serializeEnvelope, type KeeperDirective, type KeeperE
 import dotenv from 'dotenv';
 
 import { ConnectorConfigError, loadConnectorConfig } from '../config.js';
+import { assertConnectorNotRunning } from './_guard.js';
 
 const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
 dotenv.config({ path: join(ROOT, '.env') });
@@ -268,6 +269,7 @@ async function main(): Promise<void> {
   }
 
   const config = loadConnectorConfig();
+  assertConnectorNotRunning(resolve(ROOT, config.mirrorPath), 'pnpm test:judgment');
   const { transport } = createMindClient();
   process.stdout.write(
     `\nJudgment test — ${rows.length} row(s) against alias "${config.mindAlias}".\n` +
