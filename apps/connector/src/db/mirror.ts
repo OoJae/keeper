@@ -9,7 +9,37 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 
-import { BOOTSTRAP_DDL, actions, events, members, settings } from './schema.js';
+import { BOOTSTRAP_DDL, actions, events, memberAliases, members, settings } from './schema.js';
+
+export interface AliasRow {
+  readonly aliasTelegramId: number;
+  readonly canonicalTelegramId: number;
+  readonly handle: string;
+  readonly note: string;
+  readonly createdAtMs: number;
+}
+
+export interface LinkOutcome {
+  readonly status: 'linked' | 'already_linked' | 'relinked';
+  readonly realTelegramId: number;
+  readonly canonicalTelegramId: number;
+  readonly handle: string;
+  readonly previousCanonicalId?: number;
+  /** Present when the real id had already accumulated its own mirror row. */
+  readonly merged?: {
+    readonly firstSeenMs: number;
+    readonly lastSeenMs: number | null;
+    readonly messageCount: number;
+    readonly eventsMoved: number;
+  };
+}
+
+export class MirrorLinkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MirrorLinkError';
+  }
+}
 
 export interface MemberSnapshot {
   telegramId: number;
@@ -179,6 +209,147 @@ export class Mirror {
 
   listMembers(): MemberSnapshot[] {
     return this.db.select().from(members).all().map(toSnapshot);
+  }
+
+  // --- identity aliases -----------------------------------------------------
+
+  /**
+   * The id the Mind knows this person by. Identity for MEMORY (envelope, first/last seen,
+   * return detection) resolves through here; Telegram operations keep using the real id,
+   * because Telegram acts on the actual account. Returns the input when unaliased, so every
+   * existing path is unchanged.
+   *
+   * Deliberately NOT transitive: an alias chain is a mistake, not a feature.
+   */
+  resolveCanonicalId(telegramId: number): number {
+    const row = this.db
+      .select({ canonical: memberAliases.canonicalTelegramId })
+      .from(memberAliases)
+      .where(eq(memberAliases.aliasTelegramId, telegramId))
+      .all()[0];
+    return row?.canonical ?? telegramId;
+  }
+
+  listAliases(): AliasRow[] {
+    return this.db.select().from(memberAliases).all().map((r) => ({
+      aliasTelegramId: r.aliasTelegramId,
+      canonicalTelegramId: r.canonicalTelegramId,
+      handle: r.handle,
+      note: r.note,
+      createdAtMs: r.createdAtMs,
+    }));
+  }
+
+  /**
+   * Point a real Telegram account at the identity the Mind already remembers.
+   *
+   * If the real id has already spoken it will have its own members row — very likely during
+   * a live recording — so the two are merged rather than left split: earliest first_seen,
+   * latest last_seen, summed message_count, and its events re-pointed at the canonical id.
+   * That is the case which otherwise silently halves the demo's history.
+   */
+  linkMember(input: {
+    realTelegramId: number;
+    canonicalTelegramId: number;
+    handle: string;
+    note?: string;
+    force?: boolean;
+    tsMs: number;
+  }): LinkOutcome {
+    const { realTelegramId, canonicalTelegramId, handle, tsMs } = input;
+    if (realTelegramId === canonicalTelegramId) {
+      throw new MirrorLinkError('The real id and the canonical id are the same; nothing to link.');
+    }
+    const existing = this.db
+      .select()
+      .from(memberAliases)
+      .where(eq(memberAliases.aliasTelegramId, realTelegramId))
+      .all()[0];
+    if (existing !== undefined && existing.canonicalTelegramId === canonicalTelegramId) {
+      return { status: 'already_linked', realTelegramId, canonicalTelegramId, handle };
+    }
+    if (existing !== undefined && input.force !== true) {
+      throw new MirrorLinkError(
+        `${realTelegramId} is already linked to ${existing.canonicalTelegramId}, not ` +
+          `${canonicalTelegramId}. Re-run with --force to overwrite that mapping.`,
+      );
+    }
+
+    const canonicalRow = this.getMember(canonicalTelegramId);
+    if (canonicalRow === undefined && input.force !== true) {
+      throw new MirrorLinkError(
+        `No mirrored member with id ${canonicalTelegramId}. If the Mind has no memory of ` +
+          'this person there is nothing to preserve, so linking buys nothing. Use --force ' +
+          'only if you know the canonical id is right and the mirror was reset.',
+      );
+    }
+
+    return this.db.transaction((tx): LinkOutcome => {
+      const realRow = this.getMember(realTelegramId);
+      let merged: LinkOutcome['merged'];
+
+      if (realRow !== undefined && canonicalRow !== undefined) {
+        const moved = tx
+          .update(events)
+          .set({ memberTelegramId: canonicalTelegramId })
+          .where(eq(events.memberTelegramId, realTelegramId))
+          .run();
+        const lastSeen =
+          realRow.lastSeenMs === null
+            ? canonicalRow.lastSeenMs
+            : canonicalRow.lastSeenMs === null
+              ? realRow.lastSeenMs
+              : Math.max(canonicalRow.lastSeenMs, realRow.lastSeenMs);
+        tx.update(members)
+          .set({
+            firstSeenMs: Math.min(canonicalRow.firstSeenMs, realRow.firstSeenMs),
+            lastSeenMs: lastSeen,
+            messageCount: canonicalRow.messageCount + realRow.messageCount,
+          })
+          .where(eq(members.telegramId, canonicalTelegramId))
+          .run();
+        tx.delete(members).where(eq(members.telegramId, realTelegramId)).run();
+        merged = {
+          firstSeenMs: Math.min(canonicalRow.firstSeenMs, realRow.firstSeenMs),
+          lastSeenMs: lastSeen,
+          messageCount: canonicalRow.messageCount + realRow.messageCount,
+          eventsMoved: Number(moved.changes),
+        };
+      }
+
+      if (existing !== undefined) {
+        tx.delete(memberAliases).where(eq(memberAliases.aliasTelegramId, realTelegramId)).run();
+      }
+      tx.insert(memberAliases)
+        .values({
+          aliasTelegramId: realTelegramId,
+          canonicalTelegramId,
+          handle: normalizeHandle(handle) ?? handle,
+          note: input.note ?? '',
+          createdAtMs: tsMs,
+        })
+        .run();
+
+      const base = { realTelegramId, canonicalTelegramId, handle } as const;
+      if (existing !== undefined) {
+        return {
+          ...base,
+          status: 'relinked',
+          previousCanonicalId: existing.canonicalTelegramId,
+          ...(merged === undefined ? {} : { merged }),
+        };
+      }
+      return { ...base, status: 'linked', ...(merged === undefined ? {} : { merged }) };
+    });
+  }
+
+  /** Returns true when a mapping was actually removed. */
+  unlinkMember(realTelegramId: number): boolean {
+    const result = this.db
+      .delete(memberAliases)
+      .where(eq(memberAliases.aliasTelegramId, realTelegramId))
+      .run();
+    return Number(result.changes) > 0;
   }
 
   // --- events --------------------------------------------------------------

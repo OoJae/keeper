@@ -54,7 +54,14 @@ function provenanceKey(raw: string): string {
 export interface ExecutionTrigger {
   chatId: number;
   messageId: number;
+  /** REAL Telegram user id. Deletes, restricts and unmutes act on this. */
   memberTelegramId: number;
+  /**
+   * Identity as the Mind knows it, which is what a directive's `target_member` resolves
+   * to. Equal to `memberTelegramId` unless this account is aliased to a seeded cast
+   * member — in which case the two differ and both must be accepted as "the sender".
+   */
+  canonicalTelegramId: number;
   handle: string | null;
   /** Verbatim text, kept so `/keeper undo` can quote back a deleted message. */
   text: string;
@@ -296,8 +303,17 @@ function checkDeletable(
   if (ctx.nowMs - trigger.sentAtMs > ctx.deleteWindowMs) return 'delete_window_expired';
 
   // We hold exactly one message. If the Mind named someone else, deleting the message we
-  // have would punish the wrong person — flag instead.
-  if (targetTelegramId !== null && targetTelegramId !== trigger.memberTelegramId) return 'target_mismatch';
+  // have would punish the wrong person — flag instead. Both ids count as "the sender":
+  // a handle lookup returns the CANONICAL id (the only members row), while the trigger
+  // carries the REAL one, and for an aliased cast member those differ. Accepting only one
+  // would refuse a correct delete and leave spam up.
+  if (
+    targetTelegramId !== null &&
+    targetTelegramId !== trigger.memberTelegramId &&
+    targetTelegramId !== trigger.canonicalTelegramId
+  ) {
+    return 'target_mismatch';
+  }
   if (
     targetTelegramId === null &&
     targetHandle !== null &&

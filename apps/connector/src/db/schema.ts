@@ -47,6 +47,19 @@ CREATE INDEX IF NOT EXISTS events_routed_idx ON events (routed, ts_ms);
 CREATE UNIQUE INDEX IF NOT EXISTS events_message_uniq
   ON events (chat_id, message_id) WHERE message_id IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS member_aliases (
+  -- The REAL Telegram id being mapped. PK, so one account maps to at most one identity
+  -- and a re-link is a visible conflict rather than a silent second row.
+  alias_telegram_id     INTEGER PRIMARY KEY,
+  -- The id the Mind already knows this person by. Never migrate a members row to a new
+  -- id instead of aliasing: the Mind has memorised the old one and would meet a stranger.
+  canonical_telegram_id INTEGER NOT NULL,
+  handle                TEXT    NOT NULL,
+  note                  TEXT    NOT NULL DEFAULT '',
+  created_at_ms         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS member_aliases_canonical_idx ON member_aliases (canonical_telegram_id);
+
 CREATE TABLE IF NOT EXISTS actions (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id           INTEGER,
@@ -102,6 +115,14 @@ export const events = sqliteTable('events', {
   routed: integer('routed').notNull().default(0),
   /** Why the pre-filter decided as it did. Auditable budget story for the demo. */
   routeReason: text('route_reason').notNull().default(''),
+});
+
+export const memberAliases = sqliteTable('member_aliases', {
+  aliasTelegramId: integer('alias_telegram_id').primaryKey(),
+  canonicalTelegramId: integer('canonical_telegram_id').notNull(),
+  handle: text('handle').notNull(),
+  note: text('note').notNull().default(''),
+  createdAtMs: integer('created_at_ms').notNull(),
 });
 
 export const actions = sqliteTable('actions', {

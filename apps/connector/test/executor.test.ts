@@ -36,6 +36,8 @@ function trigger(overrides: Partial<ExecutionTrigger> = {}): ExecutionTrigger {
     chatId: GROUP,
     messageId: 42,
     memberTelegramId: 555,
+    // Unaliased is the normal case: the two ids are the same person and the same number.
+    canonicalTelegramId: 555,
     handle: 'rex_hotkeys',
     text: 'the jump cut at 2:14 is garbage lol',
     sentAtMs: NOW - 60_000,

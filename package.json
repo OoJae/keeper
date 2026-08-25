@@ -20,7 +20,8 @@
     "spike:wallet": "pnpm --filter @keeper/connector spike:wallet",
     "teach:charter": "pnpm --filter @keeper/connector teach:charter",
     "ping:mind": "pnpm --filter @keeper/connector ping:mind",
-    "probe:memory": "pnpm --filter @keeper/connector probe:memory"
+    "probe:memory": "pnpm --filter @keeper/connector probe:memory",
+    "link:member": "pnpm --filter @keeper/connector link:member"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

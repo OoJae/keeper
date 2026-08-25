@@ -14,7 +14,8 @@
     "spike:wallet": "tsx spikes/wallet-probe.ts",
     "teach:charter": "tsx src/teach-charter.ts",
     "ping:mind": "tsx src/tools/ping-mind.ts",
-    "probe:memory": "tsx src/tools/probe-memory.ts"
+    "probe:memory": "tsx src/tools/probe-memory.ts",
+    "link:member": "tsx src/tools/link-member.ts"
   },
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",

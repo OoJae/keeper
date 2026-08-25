@@ -66,13 +66,22 @@ export class EventRouter {
   ingest(input: IngestInput): { eventId: number; routed: boolean; reason: string; type: KeeperEvent['type'] } {
     const { mirror, config } = this.deps;
 
+    // THE identity chokepoint. A cast member seeded through the bot has a synthetic id; if
+    // that character later gets a real Telegram account, the real id must resolve to the
+    // identity the Mind already remembers, or it meets a stranger and the returning-member
+    // beat silently dies. Resolving here (and only here) means no second members row is
+    // ever created, so handle lookups stay unambiguous too. Identity is the input's own id
+    // when unaliased, which is every case but the demo cast.
+    const canonicalId = mirror.resolveCanonicalId(input.member.telegramId);
+    const identity = { ...input.member, telegramId: canonicalId };
+
     // A join is not a conversation turn: it must not advance last_seen, or the member's
     // first real message would never be classified as a return.
     const spoke = input.kind === 'message' || input.kind === 'creator_command';
     const { prior } = mirror.touchMember({
-      telegramId: input.member.telegramId,
-      handle: input.member.handle,
-      display: input.member.display,
+      telegramId: identity.telegramId,
+      handle: identity.handle,
+      display: identity.display,
       tsMs: input.tsMs,
       spoke,
     });
@@ -80,7 +89,7 @@ export class EventRouter {
     const envelope = buildEnvelope({
       kind: input.kind,
       prior,
-      member: input.member,
+      member: identity,
       content: input.text,
       ts: new Date(input.tsMs),
       group: config.groupName,
@@ -92,7 +101,7 @@ export class EventRouter {
     // so it only ever sees the earlier delivery.
     const duplicateJoin =
       input.kind === 'join' &&
-      mirror.hasJoinSince(input.member.telegramId, input.chatId, input.tsMs - JOIN_DEDUPE_MS);
+      mirror.hasJoinSince(identity.telegramId, input.chatId, input.tsMs - JOIN_DEDUPE_MS);
 
     const { fromMs, toMs } = dayWindow(input.tsMs, config.utcOffsetMinutes);
     const decision: RouteDecision = duplicateJoin
@@ -119,7 +128,7 @@ export class EventRouter {
         );
 
     const eventId = mirror.recordEvent({
-      memberTelegramId: input.member.telegramId,
+      memberTelegramId: identity.telegramId,
       chatId: input.chatId,
       messageId: input.messageId ?? null,
       type: envelope.type,
@@ -158,8 +167,11 @@ export class EventRouter {
           : {
               chatId: input.chatId,
               messageId: input.messageId,
+              // REAL id: Telegram acts on the actual account.
               memberTelegramId: input.member.telegramId,
-              handle: input.member.handle,
+              // Identity as the Mind knows it; equal to the real id when unaliased.
+              canonicalTelegramId: identity.telegramId,
+              handle: identity.handle,
               text: input.text,
               sentAtMs: input.tsMs,
             };
