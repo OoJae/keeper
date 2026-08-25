@@ -148,6 +148,19 @@ function collectCandidates(text: string, bounded: string): Candidate[] {
  * only on the repair path, i.e. after a plain JSON.parse has already failed — a valid
  * payload is never rewritten. `&amp;` is decoded last so `&amp;quot;` cannot become a quote.
  */
+/**
+ * The platform renders replies to HTML, and that reaches INSIDE the fenced block: newlines
+ * become `<br>` and indentation becomes `&nbsp;`, so the payload arrives as
+ * ```json<br>{<br>&nbsp;&nbsp;"action": "delete", … and JSON.parse rejects it.
+ * LIVE-OBSERVED 2026-08-25, where it silently discarded three CORRECT directives — the Mind
+ * had judged the events right and Keeper did nothing. Repair path only.
+ */
+function stripHtmlMarkup(raw: string): string {
+  return raw
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(?:p|div|span|pre|code|em|strong|b|i|ul|ol|li)\b[^>]*>/gi, '');
+}
+
 function decodeHtmlEntities(raw: string): string {
   return raw
     .replace(/&quot;|&#0*34;|&#x0*22;/gi, '"')
@@ -159,7 +172,7 @@ function decodeHtmlEntities(raw: string): string {
 }
 
 function repair(raw: string): string {
-  return decodeHtmlEntities(raw)
+  return decodeHtmlEntities(stripHtmlMarkup(raw))
     .replace(/^\s*json\s*/i, '')
     .replace(/[“”„‟]/g, '"')
     .replace(/[‘’‚‛]/g, "'")

@@ -65,8 +65,13 @@ export function parseCharter(markdown: string): CharterMessage[] {
 async function main(): Promise<void> {
   const dryRun = process.argv.includes('--dry-run');
   const force = process.argv.includes('--force');
+  // Re-teach a single covenant after editing it. The document is not the Mind's memory:
+  // changing docs/STEWARD-CHARTER.md does nothing until the message is sent again.
+  const onlyArg = process.argv.find((a) => a.startsWith('--only='))?.slice('--only='.length);
+  const only = onlyArg === undefined ? null : new Set(onlyArg.split(',').map(Number));
 
-  const messages = parseCharter(readFileSync(CHARTER_PATH, 'utf8'));
+  const all = parseCharter(readFileSync(CHARTER_PATH, 'utf8'));
+  const messages = only === null ? all : all.filter((m) => only.has(m.index));
   if (messages.length === 0) {
     process.stderr.write(
       `No "## Message N" blockquote sections found in ${CHARTER_PATH}.\n` +
@@ -99,7 +104,7 @@ async function main(): Promise<void> {
   let skipped = 0;
   for (const message of messages) {
     const key = `${SENT_KEY_PREFIX}${message.index}`;
-    if (!force && mirror.getSetting(key) !== undefined) {
+    if (!force && only === null && mirror.getSetting(key) !== undefined) {
       process.stdout.write(`  skip  Message ${message.index} — ${message.title} (already taught)\n`);
       skipped += 1;
       continue;

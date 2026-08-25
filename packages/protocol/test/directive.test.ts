@@ -381,4 +381,17 @@ describe('gateDirective', () => {
     if (result.kind !== 'ok') return;
     expect(result.warnings).toContain('unfenced_directive');
   });
+
+  it('parses a directive whose JSON was rendered to HTML (<br> and &nbsp;)', () => {
+    // LIVE-OBSERVED 2026-08-25: the platform renders replies to HTML and that reaches inside
+    // the fence, so newlines arrive as <br> and indentation as &nbsp;. This silently discarded
+    // three CORRECT directives — the Mind judged the events right and Keeper did nothing.
+    const reply =
+      '<p>Removing it.</p>```json<br>{<br>&nbsp;&nbsp;"action": "delete",<br>' +
+      '&nbsp;&nbsp;"target_member": "@burner_9910",<br>&nbsp;&nbsp;"reasoning": "contempt at people",' +
+      '<br>&nbsp;&nbsp;"confidence": "high"<br>}<br>```';
+    const result = extractDirective(reply);
+    expect(result.kind).toBe('ok');
+    expect(result.directive).toMatchObject({ action: 'delete', confidence: 'high' });
+  });
 });
