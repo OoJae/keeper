@@ -86,6 +86,7 @@ async function main(): Promise<void> {
 
   await runtime.start();
   seedInbox?.start();
+  runtime.watcher.reconcileOnBoot();
   runtime.watcher.start();
   // One timer drives both: the watcher polls for what the Mind sent on its own, and the
   // digest scheduler decides whether tonight still needs arming or backstopping.

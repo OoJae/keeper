@@ -23,6 +23,7 @@ import type { Mirror } from '../db/mirror.js';
 import { log } from '../log.js';
 import type { MindMessage, MindTransport } from '@keeper/minds-client';
 import { executeDirective, type ExecutionContext } from './executor.js';
+import { IN_FLIGHT_KEY } from './router.js';
 import type { SequentialQueue } from './queue.js';
 import type { TelegramSurface } from '../telegram/surface.js';
 
@@ -143,6 +144,41 @@ export class MindWatcher {
     });
     if (!accepted) this.pending = false;
     return accepted;
+  }
+
+  /**
+   * Boot-time reconciliation. If a request was outstanding when the process died, the Mind
+   * answered into the void — and the next thing we send would collect that stale reply as
+   * its own. Observed on 2026-08-26: a spam drop was judged with the previous message's
+   * reasoning and left undeleted.
+   *
+   * Only runs when the in-flight flag is actually set, so a clean restart discards nothing.
+   * The orphan is adopted into the floor rather than dispatched: at boot we cannot tell it
+   * apart from an unprompted message, and posting someone else's answer into the group is
+   * worse than staying quiet about it.
+   */
+  reconcileOnBoot(): void {
+    const { mirror } = this.deps;
+    const pending = mirror.getSetting(IN_FLIGHT_KEY);
+    if (pending === undefined) return;
+    mirror.deleteSetting(IN_FLIGHT_KEY);
+    log.warn('mind_exchange_orphaned', {
+      eventId: pending,
+      note: 'a request was outstanding when the connector stopped; its reply will be adopted, not acted on',
+    });
+    // Anything already on the server predates the next request, so raising the floor past
+    // it prevents the orphan being taken as a reply or dispatched as unprompted.
+    void this.deps.transport
+      .getHistory(this.deps.config.mindAlias, { limit: 50 })
+      .then((page) => {
+        const newest = newestOf(page);
+        const at = newest === null ? null : recordTime(newest);
+        if (newest !== null) mirror.setSetting(CURSOR_KEY, newest.id, this.now());
+        if (at !== null) mirror.setSetting(FLOOR_KEY, String(at), this.now());
+      })
+      .catch((e: unknown) => {
+        log.warn('mind_orphan_reconcile_failed', { detail: e instanceof Error ? e.message : String(e) });
+      });
   }
 
   /** Called by the router at the end of an exchange, so a digest is not stuck behind the poll. */

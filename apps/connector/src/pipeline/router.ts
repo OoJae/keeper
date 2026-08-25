@@ -23,6 +23,9 @@ import type { SequentialQueue } from './queue.js';
  * carry the same `date`, so a window this wide is generous and still cannot swallow a
  * genuine re-join (which needs a leave in between, minutes at best).
  */
+/** Set while a Mind request is outstanding; see runExchange. */
+export const IN_FLIGHT_KEY = 'mind_exchange_in_flight';
+
 const JOIN_DEDUPE_MS = 5 * 60_000;
 
 export interface IngestInput {
@@ -241,6 +244,11 @@ export class EventRouter {
 
     let replyText: string;
     let replyFingerprint = '';
+    // Marks that a request is outstanding. If the process dies here, the Mind still answers,
+    // and that orphaned reply would be collected by whatever we send next — which is exactly
+    // how the spam drop on 2026-08-26 was judged with Marco's reasoning. The flag lets boot
+    // drain it. There is no correlation id in the platform, so this is the only handle we have.
+    mirror.setSetting(IN_FLIGHT_KEY, String(eventId), this.now());
     try {
       const exchange = await transport.sendAndAwaitReply(config.mindAlias, envelopeText, {
         timeoutMs: config.mindTimeoutMs,
@@ -250,6 +258,7 @@ export class EventRouter {
       // unprompted message. Persisted, so a crash between here and execution loses the
       // directive rather than double-executing it — the safer of the two.
       replyFingerprint = exchange.reply.id;
+      mirror.deleteSetting(IN_FLIGHT_KEY);
       mirror.setSetting('mind_watch_claimed', exchange.reply.id, this.now());
       log.info('mind_exchange', {
         eventId,
@@ -259,6 +268,7 @@ export class EventRouter {
       });
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
+      // Left set on purpose: a timeout means the answer may still be coming.
       log.error('mind_exchange_failed', { eventId, detail });
       mirror.recordAction({
         eventId,

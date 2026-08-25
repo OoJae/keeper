@@ -188,3 +188,46 @@ describe('when the platform ignores the after cursor', () => {
     mirror2.close();
   });
 });
+
+describe('orphaned exchange after a crash', () => {
+  it('adopts the stale reply instead of letting the next request collect it', async () => {
+    // 2026-08-26: the connector died mid-exchange, the Mind answered anyway, and the next
+    // event (a spam drop) was judged with the previous message's reasoning — and left
+    // undeleted. The orphan must be neutralised at boot.
+    const m = Mirror.open(':memory:');
+    const s2 = new FakeSurface();
+    const t2 = new FakeTransport();
+    const q2 = new SequentialQueue({ maxPending: 5, onError: () => {} });
+    t2.history = [mindMsg('fp-orphan', '<p>an answer to a question nobody is waiting for</p>', NOW)];
+    m.setSetting('mind_exchange_in_flight', '49', NOW);
+
+    const w = new MindWatcher({ transport: t2, mirror: m, surface: s2, queue: q2, config, now: () => NOW });
+    w.reconcileOnBoot();
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Flag cleared, and the orphan is behind the floor: not dispatched into the group/DM.
+    expect(m.getSetting('mind_exchange_in_flight')).toBeUndefined();
+    await w.sweep();
+    expect(s2.groupMessages).toHaveLength(0);
+    expect(s2.directMessages).toHaveLength(0);
+    m.close();
+  });
+
+  it('discards nothing on a clean restart', async () => {
+    const m = Mirror.open(':memory:');
+    const s2 = new FakeSurface();
+    const t2 = new FakeTransport();
+    const q2 = new SequentialQueue({ maxPending: 5, onError: () => {} });
+    const w = new MindWatcher({ transport: t2, mirror: m, surface: s2, queue: q2, config, now: () => NOW });
+
+    t2.history = [mindMsg('fp-a', 'old', NOW - 60_000)];
+    await w.sweep(); // cold start baseline
+    w.reconcileOnBoot(); // no flag set -> no-op
+    await new Promise((r) => setTimeout(r, 20));
+
+    t2.history.push(mindMsg('fp-digest', '<p>tonight was quiet</p>', NOW));
+    await w.sweep();
+    expect(s2.directMessages).toHaveLength(1); // a genuine unprompted digest still lands
+    m.close();
+  });
+});
