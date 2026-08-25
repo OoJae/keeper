@@ -18,7 +18,9 @@
     "spike:proactive": "pnpm --filter @keeper/connector spike:proactive",
     "spike:circle": "pnpm --filter @keeper/connector spike:circle",
     "spike:wallet": "pnpm --filter @keeper/connector spike:wallet",
-    "teach:charter": "pnpm --filter @keeper/connector teach:charter"
+    "teach:charter": "pnpm --filter @keeper/connector teach:charter",
+    "ping:mind": "pnpm --filter @keeper/connector ping:mind",
+    "probe:memory": "pnpm --filter @keeper/connector probe:memory"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

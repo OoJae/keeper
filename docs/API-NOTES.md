@@ -187,6 +187,29 @@ funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) app
 
 ---
 
+## Corrections after the first top-up (LIVE-VERIFIED 2026-08-25)
+
+- **`creditsStaged` IS the spendable pool, but it lags.** Right after topping up, the
+  endpoint still read `staged=0.194` and the Mind was already answering; minutes later it
+  read `430.887`. So a balance read is not a liveness check in either direction. The only
+  reliable test is an actual exchange — `pnpm ping:mind` does exactly that, and exists to
+  tell "out of Cognition" apart from "platform down".
+- **Latency reaches ~200s, not 65s.** Charter message 2 took 113.8s, message 5 124.4s, and
+  a memory question 199s. The 180s default silently turned slow-but-successful answers into
+  timeouts, including one that had already been answered. `KEEPER_MIND_TIMEOUT_MS` is now
+  300000. Treat 23-65s as the common case and ~200s as the tail.
+- **The Mind's fenced block arrives with the newline collapsed:** ` ```json{ "action": … }``` `
+  — a real fence, rendered to HTML. A parser requiring a newline after the info string reads
+  every genuine directive as unfenced prose, which the executor then refuses for destructive
+  actions. Keeper identified spam correctly and declined to delete it. Fixed in
+  packages/protocol.
+- **Charter recall works.** Asked cold, in a later exchange, the Mind answered: *"Lena.
+  @lena_learns, id -2567697543. First seen in the group on 2026-08-25, asking why her 1080p60
+  h264 exports stutter … Open loop: she hasn't come back to say whether any of it helped."*
+  Per-member memory and open-loop tracking are LIVE-VERIFIED, from the Mind's own memory.
+
+---
+
 ## COGNITION IS THE BINDING CONSTRAINT (LIVE-VERIFIED 2026-08-24) ⚠️
 
 The free tier ran dry mid-build, and the failure mode is silence: the Mind simply stops

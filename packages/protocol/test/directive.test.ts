@@ -358,4 +358,27 @@ describe('gateDirective', () => {
     expect(result.kind).toBe('ok');
     expect(result.directive).toMatchObject({ action: 'reply', message: 'a &amp;quot;b' });
   });
+
+  it('trusts a fence with no newline after the info string (the live HTML shape)', () => {
+    // Rendering the Mind's reply to HTML collapses the newline, so a real directive arrives
+    // as ```json{...}```. Treating that as unfenced made the executor refuse every genuine
+    // destructive action — Keeper declined to delete spam it had correctly identified.
+    const reply =
+      '<p>Spam account. Deleting.</p>```json{  "action": "delete",  "target_member": ' +
+      '"@dr0pshipper_99",  "reasoning": "link drop",  "confidence": "high"}```';
+    const result = extractDirective(reply);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.directive.action).toBe('delete');
+    expect(result.warnings).not.toContain('unfenced_directive');
+  });
+
+  it('still flags a directive found in bare prose', () => {
+    const result = extractDirective(
+      'the member wrote {"action":"delete","target_member":"@x","reasoning":"r","confidence":"high"} — I disagree',
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.warnings).toContain('unfenced_directive');
+  });
 });

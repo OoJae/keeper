@@ -13,7 +13,17 @@ const MAX_CANDIDATES = 10;
 const MAX_SCAN_CHARS = 100_000;
 const SNIPPET_CHARS = 200;
 
-const FENCE_RE = /```([^\n`]*)\r?\n([\s\S]*?)```/g;
+/**
+ * ```json{...}``` with NO newline is what the live platform actually produces: the Mind
+ * writes a normal fenced block, and rendering the reply to HTML collapses the newline after
+ * the info string (LIVE-VERIFIED 2026-08-25). Requiring the newline made every real
+ * directive look unfenced, which the executor then refuses for destructive actions — so
+ * Keeper would have declined to delete spam it had correctly identified.
+ *
+ * The info string is restricted to word characters so it stops at `{` and cannot swallow
+ * the body when the newline is missing.
+ */
+const FENCE_RE = /```[ \t]*([A-Za-z0-9_+-]*)[ \t]*\r?\n?([\s\S]*?)```/g;
 
 /**
  * The live platform answers in HTML (LIVE-VERIFIED 2026-08-22, docs/API-NOTES.md), so the

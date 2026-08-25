@@ -20,7 +20,11 @@ export interface ConnectorConfig {
   mirrorPath: string;
   /** One long-lived Minds conversation per community (see docs/API-NOTES.md). */
   mindAlias: string;
-  /** Mind exchanges measured at 23-65s; this is the give-up point, not a target. */
+  /**
+   * Give-up point, not a target. Measured 23-65s early on, but a charter-sized prompt took
+   * 124s and a memory question 199s (LIVE-VERIFIED 2026-08-25) — 180s was too tight and
+   * silently turned slow-but-fine answers into timeouts.
+   */
   mindTimeoutMs: number;
   /** Minutes east of UTC used for envelope timestamps and the daily-budget day boundary. */
   utcOffsetMinutes: number;
@@ -76,8 +80,8 @@ const FIXES: Record<string, string> = {
     '(one long-lived conversation per community — do not rotate it, memory recall across fresh ' +
     'conversations is not reliable, see docs/API-NOTES.md)',
   mindTimeoutMs:
-    'KEEPER_MIND_TIMEOUT_MS must be a positive integer. Measured latency is 23-65s, so use:  ' +
-    'KEEPER_MIND_TIMEOUT_MS=180000',
+    'KEEPER_MIND_TIMEOUT_MS must be a positive integer. Measured latency reaches ~200s, so use:  ' +
+    'KEEPER_MIND_TIMEOUT_MS=300000',
   utcOffsetMinutes:
     'KEEPER_UTC_OFFSET_MINUTES must be minutes east of UTC between -840 and 840. Hong Kong is ' +
     '+08:00, so use:  KEEPER_UTC_OFFSET_MINUTES=480',
