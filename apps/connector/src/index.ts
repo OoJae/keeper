@@ -74,6 +74,7 @@ async function main(): Promise<void> {
       .catch((e: unknown) => log.error('shutdown_failed', { detail: e instanceof Error ? e.message : String(e) }))
       .finally(() => {
         seedInbox?.stop();
+        runtime.watcher.stop();
         mirror.close();
         releaseLock();
         process.exit(0);
@@ -84,6 +85,7 @@ async function main(): Promise<void> {
 
   await runtime.start();
   seedInbox?.start();
+  runtime.watcher.start();
   log.info('keeper_ready', {
     group: config.groupName,
     chatId: config.groupChatId,

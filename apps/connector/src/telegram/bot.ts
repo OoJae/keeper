@@ -16,6 +16,7 @@ import { handleCreatorCommand, isKeeperCommand } from '../commands.js';
 import type { ConnectorConfig } from '../config.js';
 import type { Mirror } from '../db/mirror.js';
 import { log } from '../log.js';
+import { MindWatcher } from '../pipeline/mind-watch.js';
 import { EventRouter } from '../pipeline/router.js';
 import type { SequentialQueue } from '../pipeline/queue.js';
 import { GrammyTelegramSurface } from './surface.js';
@@ -40,6 +41,8 @@ export interface ConnectorDeps {
 export interface ConnectorRuntime {
   bot: Bot;
   router: EventRouter;
+  /** Watches for messages the Mind sent on its own; started and stopped by index.ts. */
+  watcher: MindWatcher;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -55,7 +58,10 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
   await bot.init();
   const me = bot.botInfo;
   const surface = new GrammyTelegramSurface(bot.api, me.username, me.id);
-  const router = new EventRouter({ mirror, surface, transport, queue, config });
+  // The watcher needs the surface, and the router needs the watcher (it sweeps at the end
+  // of every exchange), so both are built here where the surface exists.
+  const watcher = new MindWatcher({ transport, mirror, surface, queue, config });
+  const router = new EventRouter({ mirror, surface, transport, queue, config, watcher });
 
   const memberOf = (user: User): { telegramId: number; handle: string | null; display: string } => ({
     telegramId: user.id,
@@ -171,6 +177,7 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
   return {
     bot,
     router,
+    watcher,
 
     async start(): Promise<void> {
       await new Promise<void>((resolve, reject) => {

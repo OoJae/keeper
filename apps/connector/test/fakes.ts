@@ -82,6 +82,9 @@ export class FakeSurface implements TelegramSurface {
 export class FakeTransport implements MindTransport {
   readonly kind = 'messaging-api' as const;
   readonly sentEnvelopes: string[] = [];
+  /** What getHistory serves, oldest first. The watcher reads this. */
+  history: MindMessage[] = [];
+  historyCalls = 0;
   replies: string[] = [];
   error: Error | null = null;
 
@@ -108,8 +111,11 @@ export class FakeTransport implements MindTransport {
     return { sent, reply: this.nextReply(), latencyMs: 42, cognitionDelta: null };
   }
 
-  async getHistory(): Promise<MindMessage[]> {
-    return [];
+  async getHistory(_alias: string, opts: { limit?: number; after?: string } = {}): Promise<MindMessage[]> {
+    this.historyCalls += 1;
+    if (opts.after === undefined) return [...this.history];
+    const index = this.history.findIndex((m) => m.id === opts.after);
+    return index === -1 ? [...this.history] : this.history.slice(index + 1);
   }
 
   async healthCheck(): Promise<HealthReport> {
@@ -130,6 +136,8 @@ export function testConfig(overrides: Partial<ConnectorConfig> = {}): ConnectorC
     groupName: "Ada's Editing Lab",
     mirrorPath: ':memory:',
     seedAttribution: false,
+    watchIntervalMs: 0, // tests drive sweeps explicitly; no timers
+    watchMaxDispatchPerPass: 3,
     mindAlias: 'keeper-steward-test',
     mindTimeoutMs: 1000,
     utcOffsetMinutes: 480,

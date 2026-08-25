@@ -45,6 +45,13 @@ export interface ConnectorConfig {
    * our own. Default off — it must never be on for a real community.
    */
   seedAttribution: boolean;
+  /** How often to look for a message the Mind sent on its own. 0 disables the watcher. */
+  watchIntervalMs: number;
+  /**
+   * If one sweep finds more unread Mind messages than this, dispatch NONE of them and tell
+   * the creator. A lost cursor would otherwise replay old directives into a live group.
+   */
+  watchMaxDispatchPerPass: number;
 }
 
 export class ConnectorConfigError extends Error {
@@ -97,6 +104,14 @@ const FIXES: Record<string, string> = {
     'N routes every Nth otherwise-uninteresting message). Use:  KEEPER_AMBIENT_SAMPLE_RATE=12',
   queueMaxPending:
     'KEEPER_QUEUE_MAX_PENDING must be a positive integer. Use:  KEEPER_QUEUE_MAX_PENDING=20',
+  watchIntervalMs:
+    'KEEPER_WATCH_INTERVAL_MS must be a non-negative integer (0 disables watching for ' +
+    'messages the Mind sends on its own). Polling history costs no Cognition. Use:  ' +
+    'KEEPER_WATCH_INTERVAL_MS=20000',
+  watchMaxDispatchPerPass:
+    'KEEPER_WATCH_MAX_DISPATCH must be a positive integer. It is the flood guard: more ' +
+    'unread Mind messages than this in one sweep and none are acted on. Use:  ' +
+    'KEEPER_WATCH_MAX_DISPATCH=3',
   seedAttribution:
     "KEEPER_SEED_ATTRIBUTION must be 'true' or 'false'. It lets apps/seeder relay a cast " +
     "member's line through this bot as \"@handle: text\" when that character has no real " +
@@ -129,6 +144,8 @@ const ConfigSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    watchIntervalMs: z.coerce.number().int().nonnegative().default(20_000),
+    watchMaxDispatchPerPass: z.coerce.number().int().positive().default(3),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.priorityReserve >= cfg.dailyMindBudget) {
@@ -164,6 +181,8 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('queueMaxPending', 'KEEPER_QUEUE_MAX_PENDING');
   put('deleteWindowMs', 'KEEPER_DELETE_WINDOW_MS');
   put('seedAttribution', 'KEEPER_SEED_ATTRIBUTION');
+  put('watchIntervalMs', 'KEEPER_WATCH_INTERVAL_MS');
+  put('watchMaxDispatchPerPass', 'KEEPER_WATCH_MAX_DISPATCH');
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {

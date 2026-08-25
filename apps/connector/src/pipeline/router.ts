@@ -43,6 +43,12 @@ export interface IngestInput {
 }
 
 export interface RouterDeps {
+  /**
+   * Optional: when present, every exchange claims its own reply and then sweeps, so a
+   * digest the Mind sent while we were busy is delivered immediately instead of waiting
+   * for the next poll. Optional so existing tests construct a router without one.
+   */
+  watcher?: { sweep(opts?: { skipFingerprint?: string }): Promise<unknown> };
   mirror: Mirror;
   surface: TelegramSurface;
   transport: MindTransport;
@@ -222,11 +228,17 @@ export class EventRouter {
     const envelopeText = serializeEnvelope(envelope);
 
     let replyText: string;
+    let replyFingerprint = '';
     try {
       const exchange = await transport.sendAndAwaitReply(config.mindAlias, envelopeText, {
         timeoutMs: config.mindTimeoutMs,
       });
       replyText = exchange.reply.text ?? '';
+      // Claim this reply before executing it, so the watcher cannot also dispatch it as an
+      // unprompted message. Persisted, so a crash between here and execution loses the
+      // directive rather than double-executing it — the safer of the two.
+      replyFingerprint = exchange.reply.id;
+      mirror.setSetting('mind_watch_claimed', exchange.reply.id, this.now());
       log.info('mind_exchange', {
         eventId,
         latencyMs: exchange.latencyMs,
@@ -270,6 +282,17 @@ export class EventRouter {
     if (parsed.kind === 'ok') ctx.rawBlock = parsed.rawBlock;
 
     const outcome = await executeDirective({ surface, mirror }, parsed.directive, warnings, ctx);
+
+    // Anything the Mind said beyond this reply (a digest it decided to send mid-exchange)
+    // is delivered now rather than waiting for the next poll. Same queue job, so nothing
+    // can interleave.
+    if (this.deps.watcher !== undefined) {
+      try {
+        await this.deps.watcher.sweep({ skipFingerprint: replyFingerprint });
+      } catch (e) {
+        log.warn('mind_watch_sweep_failed', { detail: e instanceof Error ? e.message : String(e) });
+      }
+    }
 
     const actionId = mirror.recordAction({
       eventId,
