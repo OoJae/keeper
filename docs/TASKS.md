@@ -103,9 +103,12 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       answer when the Mind is slow or out of credits.
 - [x] Moderation log complete: action + reasoning + confidence + gated + what we refused
       and why + override status + the Mind's raw reply
-- [ ] **Accept:** an undo visibly reverses an action and the log reflects it
-      — covered by `apps/connector/test/executor.test.ts` + `router.test.ts`; still needs
-      one on-camera run in the real group.
+- [x] **Accept:** PASSED live 2026-08-26. Keeper replied (msg 48, 03:21:24 HKT); `/keeper undo`
+      removed it 17 minutes later and the row carries `overridden`, the note, and
+      `overridden_at_ms`. Evidence: docs/EVIDENCE/override.md
+      NOTE: an audit before this run found undo would have FAILED on the Mind's own
+      unprompted actions (no undo plan persisted) and that a failed undo still marked the
+      row overridden. Both fixed; the tracker's earlier "only needs a live run" was wrong.
 
 ## Phase 5 — Rewards Mind + Circles + on-chain reward (Aug 23–24) — P2, descopable
 - [ ] Circle: Steward ↔ Rewards Mind

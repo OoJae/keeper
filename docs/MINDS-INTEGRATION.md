@@ -21,6 +21,8 @@ happened, with a real timestamp.
 | **Multi-agent (Circles)** | Steward Mind nominates a Top Contributor from memory and asks the Rewards Mind, through a Circle, to issue it. | `apps/connector/spikes/circle-probe.ts` → Phase 5 flow | _(Phase 5 — descopable per BUILD_PLAN §12)_ |
 | **On-chain wallet** | The Rewards Mind's own wallet issues the contributor reward; receipt posted in-chat and on the dashboard. | `apps/connector/spikes/wallet-probe.ts` → Phase 5 flow | _(Phase 5)_ |
 
+| **Human override** | Every action Keeper takes is logged with the Mind's own reasoning, and reversible by the creator with one command. `/keeper undo` removes what Keeper posted; `/keeper why` recites its reasoning; `/keeper pause` stops it acting at all. The log separates *what the connector refused* from *what the human reversed*. | `apps/connector/src/commands.ts` → `pipeline/executor.ts` `applyUndo` → `actions` table | **[override.md](EVIDENCE/override.md)** — live 2026-08-26: Keeper posted at 03:21:24 HKT, the creator reversed it at 03:38:29, and the row records both times. |
+
 ## Where judgment lives (the anti-wrapper argument)
 
 Keeper implements **no** classifier, scoring function, or reward heuristic. Verifiable by
