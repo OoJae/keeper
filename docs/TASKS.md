@@ -74,12 +74,15 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       handler returns immediately and the exchange runs on a per-chat queue instead.
 
 ## Phase 2 — Teach Keeper the community (Aug 22)
-- [ ] Write `docs/STEWARD-CHARTER.md` (role, envelope format, directive format, norms,
-      moderation philosophy, standing relationship-memory instruction)
-- [ ] Send the charter to the Mind conversationally
-- [ ] Probe: "who is @ada_edits and what do you remember about her?" → answers from memory
-- [ ] Iterate until 10 scripted test messages (5 fine, 3 borderline, 2 toxic) judge correctly
-- [ ] **Accept:** 10-message judgment test passes; Mind recites any seeded member's history
+- [x] Write `docs/STEWARD-CHARTER.md` (6 messages + a gradeable 10-row judgment test)
+- [x] Send the charter to the Mind conversationally (`pnpm teach:charter`, resumable)
+- [x] Probe → the Mind recited Lena's join date, her CapCut→Premiere switch, her export
+      question and, unprompted, that the loop is still open
+- [x] **10/10** (`pnpm test:judgment`, 2026-08-25). Took two charter calibrations: a regular
+      linking their own work is not self-promo, and abuse from a no-history account is
+      removed rather than warned. Evidence: docs/EVIDENCE/judgment-test.md
+- [x] **ACCEPTED** — 10/10 with both non-negotiable rows passing (#5 returning-member names
+      the open loop without hedging, #9 spam deleted at high confidence)
 
 ## Phase 3 — Persistence features (Aug 22–23)
 - [ ] Memory — returning-member recognition (`last_seen > 48h` ⇒ `member_returned`)

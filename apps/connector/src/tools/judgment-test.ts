@@ -455,7 +455,7 @@ async function main(): Promise<void> {
     '',
     '<details><summary>Verbatim replies</summary>',
     '',
-    ...results.flatMap((r) => [`**Row ${r.row.n}** — ${r.reply.slice(0, 700)}`, '']),
+    ...results.flatMap((r) => [`**Row ${r.row.n}** — ${r.reply.slice(0, 2000)}`, '']),
     '</details>',
     '',
   ];
