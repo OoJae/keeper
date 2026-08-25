@@ -39,6 +39,7 @@ const USAGE = [
   '/keeper why — the Mind’s reasoning for its last action',
   '/keeper undo — reverse the last executed action',
   '/keeper status — pause state, today’s Cognition budget, mirror counts',
+  '/keeper digest — ask for tonight’s digest now, instead of waiting for it (one exchange)',
   '/keeper ask &lt;question&gt; — ask the Steward Mind (costs one exchange)',
 ].join('\n');
 
@@ -121,6 +122,30 @@ export async function handleCreatorCommand(deps: CommandDeps, input: CommandInpu
 
     case 'status': {
       await reply(formatStatus(deps, now()));
+      return true;
+    }
+
+    case 'digest': {
+      // The nightly digest is normally the Mind's own doing (pipeline/digest.ts arms it and
+      // the watcher delivers it). This verb exists so the beat can be filmed without waiting
+      // for 21:00 — the content still comes entirely from the Mind's memory.
+      const decision = deps.router.ingest({
+        kind: 'scheduled_digest',
+        member: input.member,
+        text:
+          'Send the digest now, from your own memory of the group — who joined, the mood, ' +
+          'anything you flagged, who is carrying the community, and who has gone quiet.',
+        chatId: input.chatId,
+        responseChatId: deps.config.creatorTelegramId,
+        ...(input.messageId === undefined ? {} : { messageId: input.messageId }),
+        tsMs: input.tsMs,
+      });
+      log.info('command', { verb: 'digest', routed: decision.routed, reason: decision.reason });
+      await reply(
+        decision.routed
+          ? 'Asked the Steward Mind for a digest. It writes it from memory, so give it a minute — it lands in your DMs.'
+          : html`I didn’t ask: ${decision.reason}.`,
+      );
       return true;
     }
 

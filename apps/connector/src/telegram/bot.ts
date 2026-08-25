@@ -16,6 +16,7 @@ import { handleCreatorCommand, isKeeperCommand } from '../commands.js';
 import type { ConnectorConfig } from '../config.js';
 import type { Mirror } from '../db/mirror.js';
 import { log } from '../log.js';
+import { DigestScheduler } from '../pipeline/digest.js';
 import { MindWatcher } from '../pipeline/mind-watch.js';
 import { EventRouter } from '../pipeline/router.js';
 import type { SequentialQueue } from '../pipeline/queue.js';
@@ -43,6 +44,8 @@ export interface ConnectorRuntime {
   router: EventRouter;
   /** Watches for messages the Mind sent on its own; started and stopped by index.ts. */
   watcher: MindWatcher;
+  /** Arms the Mind's own nightly digest, and backstops it. */
+  digest: DigestScheduler;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -62,6 +65,8 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
   // of every exchange), so both are built here where the surface exists.
   const watcher = new MindWatcher({ transport, mirror, surface, queue, config });
   const router = new EventRouter({ mirror, surface, transport, queue, config, watcher });
+  const digest = new DigestScheduler({ mirror, router, transport, queue, config });
+  watcher.onDigestDelivered = (tsMs) => digest.markDelivered(tsMs, 'mind');
 
   const memberOf = (user: User): { telegramId: number; handle: string | null; display: string } => ({
     telegramId: user.id,
@@ -178,6 +183,7 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
     bot,
     router,
     watcher,
+    digest,
 
     async start(): Promise<void> {
       await new Promise<void>((resolve, reject) => {

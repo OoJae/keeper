@@ -138,6 +138,9 @@ export function testConfig(overrides: Partial<ConnectorConfig> = {}): ConnectorC
     seedAttribution: false,
     watchIntervalMs: 0, // tests drive sweeps explicitly; no timers
     watchMaxDispatchPerPass: 3,
+    digestAtMinutes: 21 * 60,
+    digestArmLeadMs: 3 * 60 * 60 * 1000,
+    digestCutoffMs: 60 * 60 * 1000,
     mindAlias: 'keeper-steward-test',
     mindTimeoutMs: 1000,
     utcOffsetMinutes: 480,

@@ -15,7 +15,8 @@
     "teach:charter": "tsx src/teach-charter.ts",
     "ping:mind": "tsx src/tools/ping-mind.ts",
     "probe:memory": "tsx src/tools/probe-memory.ts",
-    "link:member": "tsx src/tools/link-member.ts"
+    "link:member": "tsx src/tools/link-member.ts",
+    "test:judgment": "tsx src/tools/judgment-test.ts"
   },
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",

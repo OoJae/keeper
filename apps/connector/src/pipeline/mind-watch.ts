@@ -104,6 +104,8 @@ export function classifyUnprompted(text: string): Unprompted {
 }
 
 export class MindWatcher {
+  /** Set by createConnector: lets the digest scheduler stand its fallback down. */
+  onDigestDelivered: ((tsMs: number) => void) | null = null;
   private timer: NodeJS.Timeout | null = null;
   private pending = false;
   private readonly now: () => number;
@@ -242,6 +244,9 @@ export class MindWatcher {
       ...(outcome.postedChatId === undefined ? {} : { postedChatId: outcome.postedChatId }),
       ...(outcome.postedMessageId === undefined ? {} : { postedMessageId: outcome.postedMessageId }),
     });
+    if (outcome.action === 'digest' && outcome.status === 'executed') {
+      this.onDigestDelivered?.(recordTime(message) ?? this.now());
+    }
     log.info('mind_unprompted', {
       action: outcome.action,
       status: outcome.status,

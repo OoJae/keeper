@@ -52,6 +52,12 @@ export interface ConnectorConfig {
    * the creator. A lost cursor would otherwise replay old directives into a live group.
    */
   watchMaxDispatchPerPass: number;
+  /** Minutes after local midnight for the nightly digest. -1 disables it entirely. */
+  digestAtMinutes: number;
+  /** How far ahead to ask the Mind to schedule it. It still chooses the moment. */
+  digestArmLeadMs: number;
+  /** How long past the hour to wait before the connector asks explicitly. */
+  digestCutoffMs: number;
 }
 
 export class ConnectorConfigError extends Error {
@@ -104,6 +110,15 @@ const FIXES: Record<string, string> = {
     'N routes every Nth otherwise-uninteresting message). Use:  KEEPER_AMBIENT_SAMPLE_RATE=12',
   queueMaxPending:
     'KEEPER_QUEUE_MAX_PENDING must be a positive integer. Use:  KEEPER_QUEUE_MAX_PENDING=20',
+  digestAtMinutes:
+    'KEEPER_DIGEST_AT_MINUTES is minutes after local midnight for the nightly digest ' +
+    '(-1 disables). 21:00 is 1260. Use:  KEEPER_DIGEST_AT_MINUTES=1260',
+  digestArmLeadMs:
+    'KEEPER_DIGEST_ARM_LEAD_MS must be a non-negative integer: how far ahead to ask the ' +
+    'Mind to schedule its own digest. Use:  KEEPER_DIGEST_ARM_LEAD_MS=10800000',
+  digestCutoffMs:
+    'KEEPER_DIGEST_CUTOFF_MS must be a non-negative integer: how long past the hour to wait ' +
+    'before the connector asks explicitly. Use:  KEEPER_DIGEST_CUTOFF_MS=3600000',
   watchIntervalMs:
     'KEEPER_WATCH_INTERVAL_MS must be a non-negative integer (0 disables watching for ' +
     'messages the Mind sends on its own). Polling history costs no Cognition. Use:  ' +
@@ -146,6 +161,9 @@ const ConfigSchema = z
       .transform((v) => v === 'true'),
     watchIntervalMs: z.coerce.number().int().nonnegative().default(20_000),
     watchMaxDispatchPerPass: z.coerce.number().int().positive().default(3),
+    digestAtMinutes: z.coerce.number().int().min(-1).max(1439).default(21 * 60),
+    digestArmLeadMs: z.coerce.number().int().nonnegative().default(3 * 60 * 60 * 1000),
+    digestCutoffMs: z.coerce.number().int().nonnegative().default(60 * 60 * 1000),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.priorityReserve >= cfg.dailyMindBudget) {
@@ -183,6 +201,9 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('seedAttribution', 'KEEPER_SEED_ATTRIBUTION');
   put('watchIntervalMs', 'KEEPER_WATCH_INTERVAL_MS');
   put('watchMaxDispatchPerPass', 'KEEPER_WATCH_MAX_DISPATCH');
+  put('digestAtMinutes', 'KEEPER_DIGEST_AT_MINUTES');
+  put('digestArmLeadMs', 'KEEPER_DIGEST_ARM_LEAD_MS');
+  put('digestCutoffMs', 'KEEPER_DIGEST_CUTOFF_MS');
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {
