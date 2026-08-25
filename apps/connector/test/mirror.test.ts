@@ -103,7 +103,7 @@ describe('the moderation log', () => {
     expect(undoable?.warnings).toEqual(['unfenced_directive']);
     expect(undoable?.undo).toEqual({ kind: 'delete_posted', chatId: -1, messageId: 7 });
 
-    mirror.markOverridden(id, 'undo by creator');
+    mirror.markOverridden(id, 'undo by creator', T0);
     expect(mirror.latestUndoableAction()).toBeUndefined();
     expect(mirror.latestAction()?.overridden).toBe(true);
     expect(mirror.listActions()).toHaveLength(2);

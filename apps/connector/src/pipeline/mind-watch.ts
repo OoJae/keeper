@@ -52,7 +52,15 @@ export interface SweepResult {
 }
 
 export type Unprompted =
-  | { kind: 'directive'; directive: KeeperDirective; rawBlock: string; warnings: string[]; converted?: string }
+  | {
+      kind: 'directive';
+      directive: KeeperDirective;
+      rawBlock: string;
+      warnings: string[];
+      converted?: string;
+      /** What the Mind actually asked for, before any downgrade we applied. */
+      requested?: KeeperDirective['action'];
+    }
   | { kind: 'prose'; directive: KeeperDirective };
 
 /**
@@ -75,6 +83,7 @@ export function classifyUnprompted(text: string): Unprompted {
         rawBlock: parsed.rawBlock,
         warnings: parsed.warnings,
         converted: 'unsolicited_destructive',
+        requested: parsed.directive.action,
         directive: {
           action: 'flag_creator',
           ...(target === undefined ? {} : { target_member: target }),
@@ -277,7 +286,11 @@ export class MindWatcher {
     mirror.recordAction({
       eventId: null,
       action: outcome.action,
-      originalAction: classified.kind === 'prose' ? 'none' : classified.directive.action,
+      // What the MIND asked for, before any downgrade. classified.directive is already the
+      // rewritten one, so reading the action off it would log "the Mind asked for
+      // flag_creator; I refused (unsolicited_destructive)" — nonsense, and it corrupts
+      // /keeper why's "Rewritten:" line.
+      originalAction: classified.kind === 'prose' ? 'none' : (classified.requested ?? classified.directive.action),
       targetHandle: outcome.targetHandle,
       targetTelegramId: outcome.targetTelegramId,
       message: 'message' in classified.directive ? (classified.directive.message ?? '') : '',
@@ -285,13 +298,22 @@ export class MindWatcher {
       confidence: classified.directive.confidence,
       gated: false,
       warnings: [...warnings, 'unprompted'],
-      converted: classified.kind === 'prose' ? 'unprompted_prose' : classified.converted,
+      // Keep the executor's own refusal (delete_window_expired, target_mismatch, …) when it
+      // has one; ours only names the downgrade we applied before it ran.
+      converted:
+        classified.kind === 'prose'
+          ? 'unprompted_prose'
+          : (outcome.converted ?? classified.converted),
       status: outcome.status,
       detail: outcome.detail,
       rawReply: text,
       tsMs: this.now(),
       ...(outcome.postedChatId === undefined ? {} : { postedChatId: outcome.postedChatId }),
       ...(outcome.postedMessageId === undefined ? {} : { postedMessageId: outcome.postedMessageId }),
+      // Without this, /keeper undo selects this row, finds no plan, reverses NOTHING and
+      // still reports success — on precisely the actions the Mind took by itself, which are
+      // the ones a creator most wants to take back.
+      ...(outcome.undo === undefined ? {} : { undo: outcome.undo }),
     });
     if (outcome.action === 'digest' && outcome.status === 'executed') {
       this.onDigestDelivered?.(recordTime(message) ?? this.now());

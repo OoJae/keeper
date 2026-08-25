@@ -75,7 +75,7 @@ async function main(): Promise<void> {
       .finally(() => {
         seedInbox?.stop();
         runtime.watcher.stop();
-        clearInterval(digestTimer);
+        clearInterval(scheduleTimer);
         mirror.close();
         releaseLock();
         process.exit(0);
@@ -90,13 +90,13 @@ async function main(): Promise<void> {
   runtime.watcher.start();
   // One timer drives both: the watcher polls for what the Mind sent on its own, and the
   // digest scheduler decides whether tonight still needs arming or backstopping.
-  const digestTimer = setInterval(() => {
+  const scheduleTimer = setInterval(() => {
     runtime.digest.tick();
-  runtime.checkins.tick();
     runtime.checkins.tick();
   }, 60_000);
-  digestTimer.unref?.();
+  scheduleTimer.unref?.();
   runtime.digest.tick();
+  runtime.checkins.tick();
   log.info('keeper_ready', {
     group: config.groupName,
     chatId: config.groupChatId,

@@ -157,12 +157,16 @@ export class CheckinScheduler {
           confidence: parsed.directive.confidence,
           gated: parsed.gated,
           warnings: [...parsed.warnings, 'unprompted', 'day2_checkin'],
+          // Whatever the executor refused, named — otherwise /keeper why cannot explain it.
+          ...(outcome.converted === undefined ? {} : { converted: outcome.converted }),
           status: outcome.status,
           detail: outcome.detail,
           rawReply: reply,
           tsMs: this.now(),
           ...(outcome.postedChatId === undefined ? {} : { postedChatId: outcome.postedChatId }),
           ...(outcome.postedMessageId === undefined ? {} : { postedMessageId: outcome.postedMessageId }),
+          // A check-in is posted publicly and unprompted; it must be reversible.
+          ...(outcome.undo === undefined ? {} : { undo: outcome.undo }),
         });
         log.info('checkin_armed', { member: `@${due.handle}`, delivered: outcome.status });
       } catch (e) {

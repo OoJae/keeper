@@ -4,7 +4,7 @@
  * file. See db/schema.ts for the iron rule this obeys.
  */
 import Database from 'better-sqlite3';
-import { and, desc, eq, gte, like, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, like, lt, sql } from 'drizzle-orm';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
@@ -100,6 +100,8 @@ export interface ActionRow {
   detail: string;
   overridden: boolean;
   overrideNote: string | null;
+  /** When the creator reversed it — distinct from tsMs, which is when Keeper acted. */
+  overriddenAtMs: number | null;
   postedChatId: number | null;
   postedMessageId: number | null;
   undo: unknown;
@@ -497,7 +499,16 @@ export class Mirror {
     const rows = this.db
       .select()
       .from(actions)
-      .where(and(eq(actions.status, 'executed'), eq(actions.overridden, 0)))
+      .where(
+        and(
+          eq(actions.status, 'executed'),
+          eq(actions.overridden, 0),
+          // Must actually carry a plan. A flag_creator or digest whose DM succeeded is
+          // "executed" but reverses nothing, and without this it swallows /keeper undo
+          // while the genuinely reversible action beneath it stays live.
+          isNotNull(actions.undoJson),
+        ),
+      )
       .orderBy(desc(actions.id))
       .limit(1)
       .all();
@@ -509,8 +520,13 @@ export class Mirror {
     return this.db.select().from(actions).orderBy(desc(actions.id)).limit(limit).all().map(toActionRow);
   }
 
-  markOverridden(id: number, note: string): void {
-    this.db.update(actions).set({ overridden: 1, overrideNote: note }).where(eq(actions.id, id)).run();
+  /** Only call this when the reversal actually happened; the log must not claim otherwise. */
+  markOverridden(id: number, note: string, tsMs: number): void {
+    this.db
+      .update(actions)
+      .set({ overridden: 1, overrideNote: note, overriddenAtMs: tsMs })
+      .where(eq(actions.id, id))
+      .run();
   }
 
   // --- settings ------------------------------------------------------------
@@ -586,6 +602,7 @@ function toActionRow(row: ActionRowRaw): ActionRow {
     detail: row.detail,
     overridden: row.overridden === 1,
     overrideNote: row.overrideNote,
+    overriddenAtMs: row.overriddenAtMs,
     postedChatId: row.postedChatId,
     postedMessageId: row.postedMessageId,
     undo: row.undoJson === null ? undefined : parseJson<unknown>(row.undoJson, undefined),

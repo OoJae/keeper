@@ -43,6 +43,18 @@ const USAGE = [
   '/keeper ask &lt;question&gt; — ask the Steward Mind (costs one exchange)',
 ].join('\n');
 
+/**
+ * One refusal per member per window. In-memory on purpose: a restart forgetting who was
+ * told is harmless, and a table for this would be state the mirror does not need.
+ */
+const REFUSAL_COOLDOWN_MS = 10 * 60 * 1000;
+const refusalCooldown = new Map<number, number>();
+
+/** Test seam: the cooldown is process-global, so a suite must be able to clear it. */
+export function __resetRefusalCooldownForTests(): void {
+  refusalCooldown.clear();
+}
+
 export function isKeeperCommand(text: string): boolean {
   return /^\/keeper(@[A-Za-z0-9_]+)?\b/.test(text.trim());
 }
@@ -66,7 +78,19 @@ export async function handleCreatorCommand(deps: CommandDeps, input: CommandInpu
   };
 
   if (input.fromId !== deps.config.creatorTelegramId) {
-    log.warn('command_refused', { fromId: input.fromId, text: raw });
+    // Answer once, then go quiet for a while. Without this any member can drive one bot
+    // post per message straight into the group — and because a /keeper command returns
+    // before router.ingest, it leaves no event row, so the flood is invisible to the
+    // moderation log as well. Telling them once is courteous; doing it forty times is a
+    // denial-of-service the creator would be watching live.
+    const lastRefusedAt = refusalCooldown.get(input.fromId) ?? 0;
+    const nowMs = now();
+    if (nowMs - lastRefusedAt < REFUSAL_COOLDOWN_MS) {
+      log.warn('command_refused', { fromId: input.fromId, text: raw, silenced: true });
+      return true;
+    }
+    refusalCooldown.set(input.fromId, nowMs);
+    log.warn('command_refused', { fromId: input.fromId, text: raw, silenced: false });
     await reply('Only the creator can run Keeper commands.');
     return true;
   }
@@ -112,8 +136,20 @@ export async function handleCreatorCommand(deps: CommandDeps, input: CommandInpu
       }
       const plan = (last.undo ?? { kind: 'none', note: 'nothing reversible was recorded' }) as UndoPlan;
       const result = await applyUndo({ surface: deps.surface, mirror: deps.mirror }, plan);
-      deps.mirror.markOverridden(last.id, `undo by creator: ${result.detail}`);
       log.info('command', { verb: 'undo', actionId: last.id, ok: result.ok, detail: result.detail });
+
+      // Only record an override that actually happened. Marking the row regardless made the
+      // log claim a reversal precisely when there had not been one — and left the still-live
+      // action unreachable, because an overridden row is never offered again.
+      if (!result.ok) {
+        await reply(
+          html`I could not undo action #${last.id} (<b>${last.action}</b>): ${result.detail}. ` +
+            'Nothing changed, and it is still the next thing <code>/keeper undo</code> will try.',
+        );
+        return true;
+      }
+
+      deps.mirror.markOverridden(last.id, `undo by creator: ${result.detail}`, now());
       await reply(
         html`Undid action #${last.id} (<b>${last.action}</b>): ${result.detail}. Logged as overridden.`,
       );

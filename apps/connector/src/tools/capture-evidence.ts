@@ -77,16 +77,29 @@ function main(): void {
       '',
       '### Moderation log',
       '',
-      '| when | action | asked for | confidence | status | target | the Mind’s reasoning |',
-      '|---|---|---|---|---|---|---|',
+      'Every row is the Mind’s judgement plus what the connector did with it. **What we',
+      'refused** (`converted`) and **what the creator reversed** (`overridden`) are different',
+      'columns on purpose: one is the machine declining to act, the other is a human taking',
+      'it back. Principle 7 — every action logged, reversible, overridable — is this table.',
+      '',
+      '| when | action | asked for | confidence | status | we refused | creator override | target | the Mind’s reasoning |',
+      '|---|---|---|---|---|---|---|---|---|',
       ...actions
         .slice(0, 40)
-        .map(
-          (a) =>
+        .map((a) => {
+          const gated = a.gated ? ' · gated (low confidence)' : '';
+          const refused = a.converted === null ? '—' : `\`${a.converted}\`${gated}`;
+          const override =
+            a.overridden
+              ? `**yes**${a.overriddenAtMs === null ? '' : ` at ${iso(a.overriddenAtMs)}`}` +
+                `${a.overrideNote === null ? '' : ` — ${cell(a.overrideNote)}`}`
+              : '—';
+          return (
             `| ${iso(a.tsMs)} | ${a.action} | ${a.originalAction} | ${a.confidence} | ${a.status}` +
-            `${a.overridden ? ' (overridden)' : ''} | ${a.targetHandle === null ? '—' : `@${a.targetHandle}`} | ` +
-            `${cell(a.reasoning).slice(0, 200)} |`,
-        ),
+            ` | ${refused} | ${override} | ${a.targetHandle === null ? '—' : `@${a.targetHandle}`} | ` +
+            `${cell(a.reasoning).slice(0, 200)} |`
+          );
+        }),
       '',
       '### Cognition',
       '',

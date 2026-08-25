@@ -77,6 +77,10 @@ CREATE TABLE IF NOT EXISTS actions (
   detail             TEXT    NOT NULL DEFAULT '',
   overridden         INTEGER NOT NULL DEFAULT 0,
   override_note      TEXT,
+  -- When the human intervened. The action's own ts_ms is when KEEPER acted; without this
+  -- the log cannot show how long the creator took to catch it, which is the whole point of
+  -- an audit trail a judge is invited to read.
+  overridden_at_ms   INTEGER,
   posted_chat_id     INTEGER,
   posted_message_id  INTEGER,
   undo_json          TEXT,
@@ -145,6 +149,7 @@ export const actions = sqliteTable('actions', {
   detail: text('detail').notNull().default(''),
   overridden: integer('overridden').notNull().default(0),
   overrideNote: text('override_note'),
+  overriddenAtMs: integer('overridden_at_ms'),
   postedChatId: integer('posted_chat_id'),
   postedMessageId: integer('posted_message_id'),
   undoJson: text('undo_json'),
