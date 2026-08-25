@@ -144,4 +144,15 @@ describe('CheckinScheduler', () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(sent).toHaveLength(0);
   });
+
+  it('does not double the @ when the envelope already supplied one', async () => {
+    // envelopeHandle() returns "@name", and every render site adds its own @. The check-in
+    // armed for 2026-08-27 had "@quietfox" stored, so the arming message said "@@quietfox".
+    scheduler(joined.tsMs).markDue({ ...joined, handle: '@new_kid_kai' });
+    replies = [WELCOME_BACK];
+    scheduler(elevenAmHK(27)).tick();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(sent[0]).toContain('@new_kid_kai');
+    expect(sent[0]).not.toContain('@@');
+  });
 });

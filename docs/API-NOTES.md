@@ -187,6 +187,39 @@ funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) app
 
 ---
 
+## Mind↔Mind CIRCLES DO WORK via the API (LIVE-VERIFIED 2026-08-26) ✅
+
+The baseline above says the Circles endpoints "manage **human** collaborators by email" and
+that A2A introduction is manual. **That is wrong for this deployment.** Two Minds can be put
+in a Circle programmatically, and the API says so in its own response.
+
+The payload shape matters — the singular field is rejected:
+
+```
+POST /v1/circles/{mindId}  {"email":"keeper.rewards@hellominds.ai"}    -> 400 Bad Request
+POST /v1/circles/{mindId}  {"emails":["keeper.rewards@hellominds.ai"]} -> 200
+   {"items":[{"email":"keeper.rewards@hellominds.ai",
+              "partyId":"37734f3e-…","partyType":0,"action":"mind_added"}]}
+```
+
+`action: "mind_added"` — the platform recognises the party as a Mind, not a human. Reading
+the circle back confirms it persists with the Mind's own name:
+
+```
+GET /v1/circles/{stewardId}
+  captainjoe550@gmail.com   isSteward=true    (the human)
+  Keeper.Steward/Rewards    isSteward=false   (the other Mind)
+```
+
+Both directions were added, so the trust is reciprocal. Note `summary.mindsAdded` reports
+`0` even on success — trust `items[].action`, not the summary counters.
+
+**Consequence for Phase 5:** the "manual introduction" step in `spikes/circle-probe.ts` is no
+longer the only route to a Circle. It remains unproven whether membership alone lets one Mind
+*message* another — that is a separate question, and the next experiment.
+
+---
+
 ## `?after=` DOES NOT FILTER (LIVE-VERIFIED 2026-08-25) ⚠️
 
 The baseline above records `after` as "a fingerprint used as **forward-only cursor**", taken

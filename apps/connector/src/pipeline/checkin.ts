@@ -72,7 +72,10 @@ export class CheckinScheduler {
     if (this.deps.mirror.getSetting(key) !== undefined) return; // already owed
     const record: DueCheckin = {
       memberId: input.memberId,
-      handle: input.handle ?? `user${input.memberId}`,
+      // Stored WITHOUT the @: envelopeHandle() hands us "@name" already, and every render
+      // site adds its own, so keeping it here produced "@@quietfox" in the message the Mind
+      // reads — and would have echoed into the group on camera.
+      handle: (input.handle ?? `user${input.memberId}`).replace(/^@+/, ''),
       display: input.display,
       dueDay,
       joinedAtMs: input.tsMs,
