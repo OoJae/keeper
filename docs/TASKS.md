@@ -85,11 +85,16 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       the open loop without hedging, #9 spam deleted at high confidence)
 
 ## Phase 3 — Persistence features (Aug 22–23)
-- [ ] Memory — returning-member recognition (`last_seen > 48h` ⇒ `member_returned`)
-- [ ] Continuity — open threads resumed (leave a question dangling one day, verify next day)
-- [ ] Autonomy #1 — nightly digest DM to the creator (prefer the Mind's native scheduling)
-- [ ] Autonomy #2 — newcomer welcome + day-2 check-in
-- [ ] Autonomy #3 — at-risk radar ("members going quiet") in the digest
+- [x] Memory — returning-member recognition implemented and unit-tested to the ms.
+      LIVE evidence pending Lena's return (earliest 2026-08-27 20:07 HKT — a real 48h gap)
+- [x] Continuity — the Mind holds Lena's export loop and says so unprompted when asked.
+      In-group evidence lands with her return.
+- [x] Autonomy #1 — digest FIRED NATIVELY 2026-08-25 ("on my own initiative, no re-asking").
+      docs/EVIDENCE/autonomy-digest.md. A clean one still to capture (`/keeper digest`).
+- [x] Autonomy #2 — welcome fires on join (evidenced 2026-08-26, @quietfox).
+      CheckinScheduler built and tested; its check-in is due 2026-08-27.
+- [x] Autonomy #3 — all three digest paths ask for who has gone quiet, and no code computes
+      it (asserted by test). Read it out of the clean digest.
 - [ ] **Accept:** all five fired with real timestamps, screenshotted into `docs/EVIDENCE/`
 
 ## Phase 4 — Human override + moderation log (Aug 23)
