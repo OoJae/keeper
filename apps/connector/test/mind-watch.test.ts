@@ -160,3 +160,31 @@ describe('MindWatcher', () => {
     expect(order[0]).toBe('exchange');
   });
 });
+
+describe('when the platform ignores the after cursor', () => {
+  it('still considers each message only once', async () => {
+    // LIVE-VERIFIED 2026-08-25: ?after=<newest fingerprint> returns the whole page anyway.
+    // A FakeTransport that ignores `after` reproduces that exactly. Without a timestamp
+    // floor the watcher re-dispatches history on every sweep.
+    const mirror2 = Mirror.open(':memory:');
+    const surface2 = new FakeSurface();
+    const transport2 = new FakeTransport();
+    // Ignore `after` entirely, like the real deployment.
+    transport2.getHistory = async () => [...transport2.history];
+    const queue2 = new SequentialQueue({ maxPending: 5, onError: () => {} });
+    const w = new MindWatcher({ transport: transport2, mirror: mirror2, surface: surface2, queue: queue2, config, now: () => NOW });
+
+    transport2.history = [mindMsg('fp-old', 'old chatter', NOW - 120_000)];
+    await w.sweep(); // cold start adopts the present
+
+    transport2.history.push(mindMsg('fp-new', '<p>tonight was quiet</p>', NOW));
+    await w.sweep();
+    expect(surface2.directMessages).toHaveLength(1);
+
+    // Same page served again, and again. It must not re-deliver.
+    await w.sweep();
+    await w.sweep();
+    expect(surface2.directMessages).toHaveLength(1);
+    mirror2.close();
+  });
+});

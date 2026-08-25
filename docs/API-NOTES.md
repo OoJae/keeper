@@ -187,6 +187,32 @@ funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) app
 
 ---
 
+## `?after=` DOES NOT FILTER (LIVE-VERIFIED 2026-08-25) ⚠️
+
+The baseline above records `after` as "a fingerprint used as **forward-only cursor**", taken
+from the official client's types. On this deployment it does not filter at all:
+
+```
+GET /v1/messaging/histories/keeper-steward?limit=50                    -> 50 records
+GET /v1/messaging/histories/keeper-steward?limit=50&after=<NEWEST fp>  -> 50 records
+```
+
+Asking for everything after the newest record returns the whole page. Consequences we hit:
+
+- The unprompted-message watcher re-read all history on every sweep, so its flood guard
+  fired continuously (`found=25 max=3`) and it refused to dispatch anything — correct
+  behaviour, wrong cause. It now treats a **timestamp floor** as the real guard and keeps
+  passing `after` only in case another deployment honours it.
+- It explains the `resume cursor` in every `MindReplyTimeoutError` never advancing.
+- `awaitReply` was never broken by this because it independently filters on `senderType`,
+  the echo text, its own fingerprint and the `notBefore` floor. That belt-and-braces is the
+  only reason replies worked at all — worth remembering before anyone "simplifies" it.
+
+**Rule of thumb for this platform: treat `after` as a hint, never as a guarantee. Anything
+that must not be processed twice needs its own client-side floor.**
+
+---
+
 ## The first exchange after an idle period is the slow one (LIVE-OBSERVED 2026-08-25)
 
 Two separate judgment-test runs timed out on **row 1 at exactly 300s** and then passed row 2

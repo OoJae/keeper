@@ -173,17 +173,30 @@ export class MindWatcher {
 
     const claimed = mirror.getSetting(CLAIMED_KEY) ?? undefined;
     const floor = Number(mirror.getSetting(FLOOR_KEY) ?? '0');
+    // LIVE-VERIFIED 2026-08-25: `?after=<fingerprint>` does NOT filter on this deployment —
+    // asking for records after the NEWEST fingerprint still returns the whole page. So the
+    // cursor cannot be trusted to give us only new messages, and the timestamp floor is the
+    // real guard: strictly newer than anything we have already considered. Without this the
+    // watcher re-reads all history every sweep and the flood guard fires forever.
     const candidates = page.filter((m) => {
       if (m.sender !== 'mind') return false;
       if (m.id === opts.skipFingerprint || m.id === claimed) return false;
       const at = recordTime(m);
-      // Undated records cannot be placed in time; the floor exists to stop a lost cursor
-      // replaying history, so an undated record is let through rather than lost forever.
-      return at === null || at >= floor;
+      // Undated records cannot be placed in time. They are let through rather than lost,
+      // because the alternative is silently dropping a real digest.
+      return at === null || at > floor;
     });
 
     const newest = newestOf(page);
-    if (newest !== null) mirror.setSetting(CURSOR_KEY, newest.id, this.now());
+    if (newest !== null) {
+      mirror.setSetting(CURSOR_KEY, newest.id, this.now());
+      // Advance the floor every sweep, not just at cold start: it is what actually stops
+      // the same message being considered twice.
+      const newestAt = recordTime(newest);
+      if (newestAt !== null && newestAt > floor) {
+        mirror.setSetting(FLOOR_KEY, String(newestAt), this.now());
+      }
+    }
 
     // A lost cursor or a misbehaving `after` would otherwise replay every old directive
     // into the live group. Skipping silently is bad; flooding on camera is worse.
