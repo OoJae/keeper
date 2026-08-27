@@ -110,11 +110,28 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       unprompted actions (no undo plan persisted) and that a failed undo still marked the
       row overridden. Both fixed; the tracker's earlier "only needs a live run" was wrong.
 
-## Phase 5 — Rewards Mind + Circles + on-chain reward (Aug 23–24) — P2, descopable
-- [ ] Circle: Steward ↔ Rewards Mind
-- [ ] Steward nominates a Top Contributor from relationship memory → Rewards executes on-chain
-- [ ] Proof surface: reward + receipt/link posted in group and on the dashboard
-- [ ] **Accept:** full chain runs twice in a row unattended — else Descope Plan A
+## Phase 5 — DESCOPED to Plan A on 2026-08-27 (on-chain is not reachable from this account)
+- [x] Circle: Steward ↔ Rewards Mind — **works**, both directions, over the API
+      (`POST /v1/circles/{mindId}` with `{"emails":[…]}` → `action:"mind_added"`). The
+      Rewards Mind answers: `REWARDS-ALIVE HG8NSD` in 46.5s.
+- [x] Wallet viability established — **negative, and conclusively.** Three value-moving
+      tools were tried against a Mind holding 609 credits and 0.00114 ETH on Base:
+      `WALLET_TransferNative`, `WALLET_TransferErc20`, `MENTE_SendToMind`. All three refuse
+      at the **equip** step, one layer above execution, with the identical message:
+      *"You are not allowed to equip this tool until your steward has paid for cognition
+      beyond any initial free cognition credits."* The US$10 purchase is visible to the Mind
+      and did not lift it. No transaction was ever constructed. See docs/API-NOTES.md.
+- [x] **Descope Plan A executed** (BUILD_PLAN §12) — rewards are autonomous *nominations*:
+      the Mind picks the member from its own relationship memory and says why; the creator
+      approves. `reward` → `flag_creator` with `converted: reward_needs_human`, worded as a
+      recommendation. Removed from mind-watch's unprompted-destructive set, because an
+      autonomous nomination has no triggering message by definition.
+- [ ] Evidence: one nomination captured into `docs/EVIDENCE/` (needs Steward credits)
+- [ ] Video: wallet is the roadmap line in the last 5 seconds, per §12 — **not** claimed as built
+
+> The honest framing for judges and README: the multi-agent Circle is real and demonstrated;
+> the on-chain payout is blocked by a platform billing gate we cannot open from the API, and
+> is labelled roadmap rather than dressed up. Nothing in the demo claims a transaction.
 
 ## Phase 6 — Dashboard (Aug 24–25)
 - [ ] Relationship graph (nodes sized by contribution, colored by warmth)
