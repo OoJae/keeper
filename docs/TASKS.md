@@ -155,9 +155,14 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [x] Cognition widget — community exchanges vs total, each labelled with what it measures
 - [x] **Accept: PASSED.** Opens on Lena with her four open loops in the Mind's own words.
       Evidence: docs/EVIDENCE/dashboard.png
-- [ ] Deploy: dashboard (Vercel) + connector (Railway) — live URL for judges
-      **Deliberately last.** Moving the connector moves the demo: it owns the Telegram poll and
-      the mirror, and two pollers = the 409 storm found on Aug 27. `var/` is backed up.
+- [x] **Deploy: LIVE.** Dashboard https://dashboard-chi-one-92.vercel.app (Vercel) reading
+      https://connector-production-b5e9.up.railway.app (Railway). The Railway connector runs
+      `KEEPER_MODE=api-only`, so **the Telegram bot stays local and there is exactly one poller**
+      — the deployment is a public window, not a second Keeper. Undo is disabled there and the
+      dashboard says why. Volume seeded and verified: 6 members, 20 actions, 7 unprompted, and
+      the Mind's own recollections.
+- [ ] Optional cutover: flip Railway to `KEEPER_MODE=full` and stop the local connector, so the
+      bot itself is hosted. **Not done on purpose** — do it after recording, never before.
 
 > Found while building this: a directive wrapped in `<pre><code>` with every quote
 > backslash-escaped was silently falling back to `none` — Keeper would read spam correctly and

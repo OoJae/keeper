@@ -49,6 +49,17 @@ Keeper has been running in a real Telegram group since 2026-08-24, on real elaps
   show and we do not pretend otherwise. Rewards are autonomous **nominations** the creator
   approves. Details, with the full transcript: [API-NOTES.md](docs/API-NOTES.md).
 
+## See it
+
+- **Dashboard:** <https://dashboard-chi-one-92.vercel.app> — the relationship graph, what the
+  Mind remembers about each member in its own words, the moderation log with its reasoning, and
+  everything Keeper did unprompted.
+- **API:** <https://connector-production-b5e9.up.railway.app/api/members> — the same data, raw.
+
+The deployed connector runs in `api-only` mode: it serves the mirror but does **not** run the
+Telegram bot, because the bot holds a long-poll and two of them split updates unpredictably.
+So the public dashboard is a window onto a live system, not a second copy of it, and it says so.
+
 Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
 **[docs/MINDS-INTEGRATION.md](docs/MINDS-INTEGRATION.md)** — start there.
 
