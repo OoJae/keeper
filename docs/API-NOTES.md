@@ -203,6 +203,21 @@ So a one-time top-up does not satisfy it. The wording says *steward has paid*, w
 an **account-level billing state** (plausibly the US$10/mo subscription rather than a one-time
 purchase), not per-Mind balance. Unresolved, and not resolvable from our side.
 
+**The gate is not tool-specific (LIVE-VERIFIED 2026-08-27).** Asked to send 150 MENTE to the
+Steward Mind via `MENTE_SendToMind` — the one capability it had described as ungated — the
+Rewards Mind hit the identical refusal, and reported that it also tried `WALLET_TransferErc20`
+as a control:
+
+> "That came back when I tried to equip MENTE_SendToMind... The same refusal came back when I
+> tried to equip WALLET_TransferErc20 as a sanity check, so it is not a MENTE-specific gate —
+> it is a billing gate applied across the wallet/action surface. So I never reached the point
+> of signing or broadcasting... The block is at the equip step, one layer above execution. No
+> transaction was constructed, no gas was spent, and no receipt / tx id was generated."
+
+Three tools, one refusal, at the **equip** step rather than execution. The Mind also confirmed
+the US$10 purchase is visible to it and the gate still did not lift. Nothing about this is
+reachable from our code: no value can move from a Mind on this account today.
+
 **What the wallet CAN do today**, per the same answer: read its native balance, read ERC-20
 transfers and prices, and `MENTE_SendToMind` — send MENTE gas-free to other Minds. Everything
 that signs and broadcasts a transaction — native transfers, ERC-20 transfers, swaps, raw tx,
