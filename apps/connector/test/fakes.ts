@@ -150,6 +150,9 @@ export function testConfig(overrides: Partial<ConnectorConfig> = {}): ConnectorC
     ambientSampleRate: 12,
     queueMaxPending: 20,
     deleteWindowMs: 172_800_000,
+    apiPort: 0, // tests construct the server directly; never bind a real port
+    apiAdminToken: 'test-admin-token',
+    dashboardOrigin: 'http://localhost:3000',
     ...overrides,
   };
 }

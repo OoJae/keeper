@@ -4,7 +4,7 @@
  * file. See db/schema.ts for the iron rule this obeys.
  */
 import Database from 'better-sqlite3';
-import { and, desc, eq, gte, isNotNull, like, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, like, lt, sql } from 'drizzle-orm';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
@@ -105,6 +105,19 @@ export interface RecordActionInput {
   undo?: unknown;
   rawReply: string;
   tsMs: number;
+}
+
+/** One mirrored event, as the dashboard timeline reads it. */
+export interface EventRow {
+  id: number;
+  memberTelegramId: number;
+  chatId: number;
+  messageId: number | null;
+  type: string;
+  content: string;
+  tsMs: number;
+  routed: boolean;
+  routeReason: string;
 }
 
 export interface ActionRow {
@@ -436,6 +449,36 @@ export class Mirror {
     return result.changes === 0 ? null : Number(result.lastInsertRowid);
   }
 
+  /**
+   * A member's own events, oldest first — the timeline the dashboard draws.
+   *
+   * Matches on canonical id OR any alias mapped to it, because an aliased account (Lena posts
+   * from 6896593986 but the Mind knows her as -2567697543) would otherwise show an empty
+   * history on the very panel meant to prove continuity.
+   */
+  listEventsForMember(canonicalTelegramId: number, limit = 200): EventRow[] {
+    const aliasIds = this.db
+      .select({ id: memberAliases.aliasTelegramId })
+      .from(memberAliases)
+      .where(eq(memberAliases.canonicalTelegramId, canonicalTelegramId))
+      .all()
+      .map((r) => r.id);
+    const ids = [canonicalTelegramId, ...aliasIds];
+    return this.db
+      .select()
+      .from(events)
+      .where(inArray(events.memberTelegramId, ids))
+      .orderBy(events.tsMs)
+      .limit(limit)
+      .all()
+      .map(toEventRow);
+  }
+
+  /** Every event, newest first. Used by the dashboard's activity feed. */
+  listEvents(limit = 200): EventRow[] {
+    return this.db.select().from(events).orderBy(desc(events.tsMs)).limit(limit).all().map(toEventRow);
+  }
+
   /** Mind exchanges actually spent in [fromMs, toMs). Survives a restart, unlike a counter. */
   routedCountBetween(fromMs: number, toMs: number): number {
     const row = this.db
@@ -541,6 +584,12 @@ export class Mirror {
     return row === undefined ? undefined : toActionRow(row);
   }
 
+  /** One action by id — the dashboard addresses the log by row, not by recency. */
+  getAction(id: number): ActionRow | undefined {
+    const row = this.db.select().from(actions).where(eq(actions.id, id)).all()[0];
+    return row === undefined ? undefined : toActionRow(row);
+  }
+
   listActions(limit = 50): ActionRow[] {
     return this.db.select().from(actions).orderBy(desc(actions.id)).limit(limit).all().map(toActionRow);
   }
@@ -606,6 +655,20 @@ function toSnapshot(row: MemberRow): MemberSnapshot {
     firstSeenMs: row.firstSeenMs,
     lastSeenMs: row.lastSeenMs,
     messageCount: row.messageCount,
+  };
+}
+
+function toEventRow(row: typeof events.$inferSelect): EventRow {
+  return {
+    id: row.id,
+    memberTelegramId: row.memberTelegramId,
+    chatId: row.chatId,
+    messageId: row.messageId,
+    type: row.type,
+    content: row.content,
+    tsMs: row.tsMs,
+    routed: row.routed === 1,
+    routeReason: row.routeReason,
   };
 }
 

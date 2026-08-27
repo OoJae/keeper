@@ -21,7 +21,7 @@ import { DigestScheduler } from '../pipeline/digest.js';
 import { MindWatcher } from '../pipeline/mind-watch.js';
 import { EventRouter } from '../pipeline/router.js';
 import type { SequentialQueue } from '../pipeline/queue.js';
-import { GrammyTelegramSurface } from './surface.js';
+import { GrammyTelegramSurface, type TelegramSurface } from './surface.js';
 
 /** `chat_member` is the one that matters: without it, joins never arrive. */
 const ALLOWED_UPDATES: ReadonlyArray<Exclude<keyof Update, 'update_id'>> = [
@@ -49,6 +49,8 @@ export interface ConnectorRuntime {
   digest: DigestScheduler;
   /** Remembers that a welcomed newcomer is owed a day-2 check-in. */
   checkins: CheckinScheduler;
+  /** The bot's own send/delete/restrict surface. The dashboard API undoes through this one. */
+  surface: TelegramSurface;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -190,6 +192,7 @@ export async function createConnector(deps: ConnectorDeps): Promise<ConnectorRun
     watcher,
     digest,
     checkins,
+    surface,
 
     async start(): Promise<void> {
       await new Promise<void>((resolve, reject) => {

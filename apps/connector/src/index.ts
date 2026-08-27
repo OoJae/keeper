@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { MindsConfigError, createMindClient } from '@keeper/minds-client';
 
+import { createApi } from './api/server.js';
 import { ConnectorConfigError, loadConnectorConfig } from './config.js';
 import { Mirror } from './db/mirror.js';
 import { SeedInbox } from './seed-inbox.js';
@@ -62,6 +63,17 @@ async function main(): Promise<void> {
       })
     : null;
 
+  // The dashboard's window onto the mirror. Reads are public; the one write (undo) needs the
+  // shared secret. It shares the connector's process because it shares the connector's SQLite
+  // handle and its TelegramSurface — an undo has to reach the same bot that posted.
+  const api = createApi({
+    config,
+    mirror,
+    surface: runtime.surface,
+    callLogPath: resolve(ROOT, 'var/minds-calls.jsonl'),
+  });
+  const apiServer = api.listen();
+
   let stopping = false;
   const shutdown = (signal: string): void => {
     if (stopping) return;
@@ -74,6 +86,7 @@ async function main(): Promise<void> {
       .catch((e: unknown) => log.error('shutdown_failed', { detail: e instanceof Error ? e.message : String(e) }))
       .finally(() => {
         seedInbox?.stop();
+        apiServer?.close();
         runtime.watcher.stop();
         clearInterval(scheduleTimer);
         mirror.close();

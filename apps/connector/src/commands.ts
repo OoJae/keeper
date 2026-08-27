@@ -9,7 +9,7 @@
 import type { ConnectorConfig } from './config.js';
 import type { Mirror } from './db/mirror.js';
 import { log } from './log.js';
-import { applyUndo, type UndoPlan } from './pipeline/executor.js';
+import { undoActionById } from './pipeline/executor.js';
 import { dayWindow } from './pipeline/prefilter.js';
 import type { EventRouter } from './pipeline/router.js';
 import { html, toTelegramHtml } from './telegram/html.js';
@@ -142,18 +142,21 @@ export async function handleCreatorCommand(deps: CommandDeps, input: CommandInpu
     }
 
     case 'undo': {
+      // Finding WHICH action to reverse is this command's job ("the last reversible one").
+      // Actually reversing it is `undoActionById`, shared with the dashboard so the override
+      // bookkeeping has exactly one implementation.
       const last = deps.mirror.latestUndoableAction();
       if (last === undefined) {
         await reply('Nothing to undo — my last action didn’t change anything in the group.');
         return true;
       }
-      const plan = (last.undo ?? { kind: 'none', note: 'nothing reversible was recorded' }) as UndoPlan;
-      const result = await applyUndo({ surface: deps.surface, mirror: deps.mirror }, plan);
+      const result = await undoActionById(
+        { surface: deps.surface, mirror: deps.mirror },
+        last.id,
+        now(),
+      );
       log.info('command', { verb: 'undo', actionId: last.id, ok: result.ok, detail: result.detail });
 
-      // Only record an override that actually happened. Marking the row regardless made the
-      // log claim a reversal precisely when there had not been one — and left the still-live
-      // action unreachable, because an overridden row is never offered again.
       if (!result.ok) {
         await reply(
           html`I could not undo action #${last.id} (<b>${last.action}</b>): ${result.detail}. ` +
@@ -162,7 +165,6 @@ export async function handleCreatorCommand(deps: CommandDeps, input: CommandInpu
         return true;
       }
 
-      deps.mirror.markOverridden(last.id, `undo by creator: ${result.detail}`, now());
       await reply(
         html`Undid action #${last.id} (<b>${last.action}</b>): ${result.detail}. Logged as overridden.`,
       );

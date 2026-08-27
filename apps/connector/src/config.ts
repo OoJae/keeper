@@ -63,6 +63,19 @@ export interface ConnectorConfig {
    * Not a send time: the Mind still chooses the moment and the words.
    */
   checkinAtMinutes: number;
+  /** Port for the dashboard API. 0 disables the server entirely. */
+  apiPort: number;
+  /**
+   * Shared secret for the ONE endpoint that mutates (undo). Empty disables writes outright —
+   * a public dashboard that can moderate a live group without a secret is not acceptable, so
+   * the safe state is the default rather than something you must remember to set.
+   */
+  apiAdminToken: string;
+  /**
+   * Exact origin allowed to call the API from a browser. Not `*`: one endpoint mutates, and
+   * a wildcard would let any page a creator visits reach a localhost connector.
+   */
+  dashboardOrigin: string;
 }
 
 export class ConnectorConfigError extends Error {
@@ -174,6 +187,9 @@ const ConfigSchema = z
     digestArmLeadMs: z.coerce.number().int().nonnegative().default(3 * 60 * 60 * 1000),
     digestCutoffMs: z.coerce.number().int().nonnegative().default(60 * 60 * 1000),
     checkinAtMinutes: z.coerce.number().int().min(-1).max(1439).default(10 * 60),
+    apiPort: z.coerce.number().int().min(0).max(65535).default(4000),
+    apiAdminToken: z.string().default(''),
+    dashboardOrigin: z.string().default('http://localhost:3000'),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.priorityReserve >= cfg.dailyMindBudget) {
@@ -215,6 +231,9 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('digestArmLeadMs', 'KEEPER_DIGEST_ARM_LEAD_MS');
   put('digestCutoffMs', 'KEEPER_DIGEST_CUTOFF_MS');
   put('checkinAtMinutes', 'KEEPER_CHECKIN_AT_MINUTES');
+  put('apiPort', 'KEEPER_API_PORT');
+  put('apiAdminToken', 'KEEPER_ADMIN_TOKEN');
+  put('dashboardOrigin', 'KEEPER_DASHBOARD_ORIGIN');
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {

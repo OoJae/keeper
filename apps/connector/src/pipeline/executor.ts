@@ -15,7 +15,7 @@
  */
 import type { DirectiveAction, KeeperDirective } from '@keeper/protocol';
 
-import type { Mirror } from '../db/mirror.js';
+import type { ActionRow, Mirror } from '../db/mirror.js';
 import { TELEGRAM_MAX_MESSAGE_CHARS, decodeEntities, html, toTelegramHtml } from '../telegram/html.js';
 import type { TelegramSurface } from '../telegram/surface.js';
 
@@ -440,4 +440,59 @@ export async function applyUndo(deps: ExecutorDeps, plan: UndoPlan): Promise<{ o
     default:
       return { ok: true, detail: plan.note };
   }
+}
+
+/**
+ * Reverse one action BY ID, and record the override only if the reversal really happened.
+ *
+ * This is the single undo implementation. `/keeper undo` and the dashboard's undo button both
+ * come through here on purpose: a Phase 4 audit found two real bugs in this sequence — actions
+ * the Mind took unprompted carried no undo plan, and a *failed* undo still marked the row
+ * overridden, which simultaneously lied in the log and made the still-live action unreachable,
+ * because an overridden row is never offered again. Both are fixed once, here, rather than in
+ * every caller that wants to reverse something.
+ */
+export type UndoOutcome =
+  | { ok: true; action: ActionRow; detail: string }
+  | {
+      ok: false;
+      reason: 'not_found' | 'already_overridden' | 'nothing_reversible' | 'failed';
+      action: ActionRow | null;
+      detail: string;
+    };
+
+export async function undoActionById(
+  deps: ExecutorDeps,
+  id: number,
+  nowMs: number,
+): Promise<UndoOutcome> {
+  const action = deps.mirror.getAction(id);
+  if (action === undefined) {
+    return { ok: false, reason: 'not_found', action: null, detail: `no action #${id} in the log` };
+  }
+  if (action.overridden) {
+    return {
+      ok: false,
+      reason: 'already_overridden',
+      action,
+      detail: `action #${id} was already reversed`,
+    };
+  }
+  if (action.undo === null || action.undo === undefined) {
+    return {
+      ok: false,
+      reason: 'nothing_reversible',
+      action,
+      detail: `action #${id} (${action.action}) did not change anything in the group`,
+    };
+  }
+
+  const result = await applyUndo(deps, action.undo as UndoPlan);
+  if (!result.ok) {
+    // Deliberately no markOverridden here. See the note above.
+    return { ok: false, reason: 'failed', action, detail: result.detail };
+  }
+
+  deps.mirror.markOverridden(id, `undo by creator: ${result.detail}`, nowMs);
+  return { ok: true, action, detail: result.detail };
 }
