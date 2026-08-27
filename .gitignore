@@ -10,3 +10,11 @@ var/
 .env.local
 .DS_Store
 *.log
+
+# Playwright MCP scratch output
+.playwright-mcp/
+
+# Next.js build output
+apps/dashboard/.next/
+apps/dashboard/next-env.d.ts
+*.tsbuildinfo
