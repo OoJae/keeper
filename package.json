@@ -24,7 +24,9 @@
     "link:member": "pnpm --filter @keeper/connector link:member",
     "test:judgment": "pnpm --filter @keeper/connector test:judgment",
     "dashboard:recall": "pnpm --filter @keeper/connector dashboard:recall",
-    "evidence:capture": "pnpm --filter @keeper/connector evidence:capture"
+    "evidence:capture": "pnpm --filter @keeper/connector evidence:capture",
+    "dev:site": "pnpm --filter @keeper/site dev",
+    "build:site": "pnpm --filter @keeper/site build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

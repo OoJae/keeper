@@ -60,6 +60,14 @@ The deployed connector runs in `api-only` mode: it serves the mirror but does **
 Telegram bot, because the bot holds a long-poll and two of them split updates unpredictably.
 So the public dashboard is a window onto a live system, not a second copy of it, and it says so.
 
+## The site
+
+`apps/site` is Keeper's public face — brand assets and six pages, built from the same real record
+as everything else. Its signature is **the Corridor of Days**: scroll is time, cards hang in
+Z-space at their true timestamps, and the 52-hour silence between Lena's last message and her
+return is something you physically traverse before the retrieved thread assembles beside Keeper's
+reply. `pnpm dev:site` → <http://localhost:3200>. The design system is documented at `/brand`.
+
 Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
 **[docs/MINDS-INTEGRATION.md](docs/MINDS-INTEGRATION.md)** — start there.
 
