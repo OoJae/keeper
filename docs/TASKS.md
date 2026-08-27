@@ -138,15 +138,30 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 > the on-chain payout is blocked by a platform billing gate we cannot open from the API, and
 > is labelled roadmap rather than dressed up. Nothing in the demo claims a transaction.
 
-## Phase 6 — Dashboard (Aug 24–25)
-- [ ] Relationship graph (nodes sized by contribution, colored by warmth)
-- [ ] Member timeline rendered from the Mind's own recollection
-- [ ] Moderation log with reasoning + override buttons
-- [ ] Leaderboard + issued rewards
-- [ ] "Unprompted actions" feed (timestamped)
-- [ ] Cognition-spent-today widget
-- [ ] Deploy: dashboard (Vercel) + connector (Fly/Railway) — live URL for judges
-- [ ] **Accept:** a stranger understands Keeper from 30 seconds of dashboard
+## Phase 6 — Dashboard (built 2026-08-28)
+- [x] Connector HTTP API (`apps/connector/src/api/server.ts`) — reads public, one write (undo)
+      behind `KEEPER_ADMIN_TOKEN`. With no token set, writes are refused outright rather than
+      left open. 10 tests incl. the auth boundary and the Phase 4 failed-undo regression.
+- [x] `undoActionById` extracted — `/keeper undo` and the dashboard share ONE implementation,
+      so the override bookkeeping cannot drift between the two surfaces
+- [x] `pnpm dashboard:recall` — asks the Mind per member for summary, open loops and **warmth**,
+      caches to `var/member-recall.json` (an exchange is 25-200s; a page load cannot wait).
+      Runs on a scratch alias, never `keeper-steward`, which the connector polls.
+- [x] Relationship graph — size = messages (counted), colour = warmth (**the Mind's judgment**)
+- [x] Member timeline rendered from the Mind's own recollection, quoted, with capture timestamp
+- [x] Moderation log with reasoning + confidence + gated + converted + override, undo buttons
+- [x] Leaderboard + reward **nominations** (Plan A; no transaction implied anywhere)
+- [x] "Unprompted actions" feed — `event_id IS NULL`, a property of the data, not a label
+- [x] Cognition widget — community exchanges vs total, each labelled with what it measures
+- [x] **Accept: PASSED.** Opens on Lena with her four open loops in the Mind's own words.
+      Evidence: docs/EVIDENCE/dashboard.png
+- [ ] Deploy: dashboard (Vercel) + connector (Railway) — live URL for judges
+      **Deliberately last.** Moving the connector moves the demo: it owns the Telegram poll and
+      the mirror, and two pollers = the 409 storm found on Aug 27. `var/` is backed up.
+
+> Found while building this: a directive wrapped in `<pre><code>` with every quote
+> backslash-escaped was silently falling back to `none` — Keeper would read spam correctly and
+> do nothing. Fixed in `packages/protocol` with the safety guard asserted by test.
 
 ## Phase 7 — Demo scenario lock + video (Aug 25–26)
 - [x] `pnpm demo:run` stages every beat in order (`--dry-run` prints the run sheet
