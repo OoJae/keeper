@@ -6,7 +6,7 @@
  * Deliberately not a scroll-linked animation: reveals that re-run every time you scroll past are
  * the scattered-motion tell. This observes, fires, and disconnects.
  */
-import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from 'react';
 
 export function Reveal({
   children,
@@ -14,6 +14,7 @@ export function Reveal({
   delay = 0,
   mode = 'mask',
   className = '',
+  style: extra,
 }: {
   children: ReactNode;
   as?: ElementType;
@@ -22,6 +23,8 @@ export function Reveal({
   /** `mask` slides a line up behind overflow:hidden. `fade` is for anything that must not clip. */
   mode?: 'mask' | 'fade';
   className?: string;
+  /** Merged after the delay variable, so a caller can set a one-off type size. */
+  style?: CSSProperties;
 }) {
   const ref = useRef<HTMLElement>(null);
   const [shown, setShown] = useState(false);
@@ -43,7 +46,7 @@ export function Reveal({
     return () => io.disconnect();
   }, []);
 
-  const style = { ['--reveal-delay' as string]: `${delay}s` };
+  const style = { ['--reveal-delay' as string]: `${delay}s`, ...extra };
 
   if (mode === 'fade') {
     return (

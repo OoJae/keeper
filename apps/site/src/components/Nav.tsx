@@ -20,7 +20,7 @@ export function Nav() {
     <header className="fixed inset-x-0 top-0 z-50 mix-blend-difference">
       <nav
         aria-label="Primary"
-        className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-6 md:px-10"
+        className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-5 py-5 md:px-10 md:py-6"
       >
         <Link href="/" className="group flex items-center gap-3" aria-label="Keeper — home">
           <svg viewBox="0 0 48 48" fill="none" className="h-5 w-5 text-paper" aria-hidden="true">
@@ -40,15 +40,15 @@ export function Nav() {
               className="origin-center transition-transform duration-500 ease-out group-hover:rotate-[26deg]"
             />
           </svg>
-          <span className="voice-record t-label text-paper">Keeper</span>
+          <span className="voice-record t-label hidden text-paper sm:inline">Keeper</span>
         </Link>
 
-        <ul className="flex items-center gap-5 md:gap-8">
+        <ul className="flex items-center gap-4 md:gap-8">
           {LINKS.map((l) => (
             <li key={l.href}>
               <Link
                 href={l.href}
-                className="voice-record t-label text-paper/70 transition-colors duration-300 hover:text-paper"
+                className="voice-record text-[0.62rem] uppercase leading-none tracking-[0.14em] text-paper/70 transition-colors duration-300 hover:text-paper md:text-[0.7rem]"
                 aria-current={path === l.href ? 'page' : undefined}
               >
                 <span className={path === l.href ? 'border-b border-paper pb-1' : ''}>{l.label}</span>

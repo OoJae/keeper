@@ -79,3 +79,17 @@ body {
   }
   .reveal > *, .fade { transform: none !important; opacity: 1 !important; }
 }
+
+/* The mark's trace: drawn once, then left. It stops short of the start on purpose — a loop that
+   closed would promise the opposite of what Keeper does. */
+.mark-trace {
+  stroke-dasharray: 108;
+  stroke-dashoffset: 108;
+  animation: mark-draw 1.6s var(--ease-out) 0.2s forwards;
+}
+@keyframes mark-draw {
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark-trace { animation: none; stroke-dashoffset: 0; }
+}
