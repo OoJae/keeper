@@ -18,10 +18,39 @@ Delete our database and Keeper still remembers everyone.
 Built for **Creative Minds Jam #1: Hong Kong** (Track 3 — Moderation & Community
 Assistance) by a solo student builder.
 
-## Status
+## What it actually does, and what it doesn't
 
-🚧 Day 1 of an 8-day sprint. Scaffold + protocol + Minds adapter + Phase 0 spike harness
-are in; the connector core loop is next. See [docs/TASKS.md](docs/TASKS.md).
+Keeper has been running in a real Telegram group since 2026-08-24, on real elapsed days.
+
+**Working, with timestamped evidence:**
+
+- **Remembers members across sessions.** Asked from a conversation it had never used, 52 hours
+  after her last message, the Mind returned Lena's join date, her CapCut→Premiere switch, her
+  export-stutter question and the proxy exchange with its timestamp — and held her two Telegram
+  ids as one person. → [memory-continuity.md](docs/EVIDENCE/memory-continuity.md)
+- **Tracks open loops and resumes them.** Unprompted, it listed three unresolved threads with
+  that member and named the live one. No code computes this; there is no open-loops table.
+- **Acts without being asked.** Nightly digests, newcomer welcomes, next-day check-ins, an
+  at-risk radar — fired on the Mind's own initiative, not on a cron we wrote.
+  → [autonomy-digest.md](docs/EVIDENCE/autonomy-digest.md)
+- **Moderates on context, not keywords.** 10/10 on a scripted judgment test including cases a
+  keyword bot gets wrong in both directions. → [judgment-test.md](docs/EVIDENCE/judgment-test.md)
+- **Stays overridable.** `/keeper undo` reversed a live action 17 minutes after it posted, and
+  the log records both moments. → [override.md](docs/EVIDENCE/override.md)
+- **Talks to a second Mind.** Steward and Rewards are in a reciprocal Circle, added over the
+  API — which the public docs say is for humans only.
+
+**Not working, and why:**
+
+- **No on-chain reward was issued.** The Rewards Mind has a funded wallet on Base, but every
+  tool that can move value refuses at the *equip* step: *"You are not allowed to equip this tool
+  until your steward has paid for cognition beyond any initial free cognition credits."* Two
+  US$10 purchases did not lift it. No transaction was ever constructed, so there is no hash to
+  show and we do not pretend otherwise. Rewards are autonomous **nominations** the creator
+  approves. Details, with the full transcript: [API-NOTES.md](docs/API-NOTES.md).
+
+Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
+**[docs/MINDS-INTEGRATION.md](docs/MINDS-INTEGRATION.md)** — start there.
 
 ## Repo layout
 
