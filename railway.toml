@@ -1,0 +1,15 @@
+# Railway deploys the CONNECTOR only. The dashboard goes to Vercel (BUILD_PLAN §4).
+#
+# The connector owns the Telegram long-poll, so exactly one instance may ever run: two
+# pollers produce a 409 storm where updates are split unpredictably between them. That is
+# not theoretical — a stale local instance did it on 2026-08-27 and cost 25 conflicts.
+[build]
+builder = "dockerfile"
+dockerfilePath = "apps/connector/Dockerfile"
+
+[deploy]
+# No horizontal scaling, ever. See above.
+numReplicas = 1
+# A crash should bring the bot back; a crash-loop should stop and be looked at.
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

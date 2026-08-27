@@ -1,0 +1,22 @@
+# Never ship secrets into an image layer.
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
+
+# The mirror is mounted as a volume at runtime, never baked in. Baking it would ship a
+# stale moderation log AND overwrite the live one on every redeploy.
+var/
+var.backup-*/
+
+.git
+.github
+docs/EVIDENCE
+.playwright-mcp
+apps/dashboard
+apps/seeder
