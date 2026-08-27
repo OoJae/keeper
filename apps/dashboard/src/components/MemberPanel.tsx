@@ -65,6 +65,17 @@ export function MemberPanel({ member, nowMs }: { member: Member | null; nowMs: n
         {member.messageCount} messages
       </p>
 
+      {member.pseudonymous === true && (
+        // Said out loud rather than quietly done. A real person joined a real Telegram group;
+        // the cast around them is fictional. Keeper's behaviour towards them is the evidence
+        // worth showing, and their identity is not ours to publish.
+        <p className="mt-3 rounded border border-sky-900/60 bg-sky-950/20 p-2 text-xs text-sky-300">
+          This is a <b>real person</b>, not one of the fictional cast. Their identity, their
+          messages and the Mind&rsquo;s written assessment of them are withheld from this public
+          view. What Keeper <i>did</i> — the welcome, the day-2 check-in — is shown in full.
+        </p>
+      )}
+
       {recall === null ? (
         <p className="mt-4 rounded border border-neutral-800 bg-neutral-950/60 p-3 text-sm text-neutral-500">
           No cached recollection yet. Run <code className="text-neutral-300">pnpm dashboard:recall</code> — it

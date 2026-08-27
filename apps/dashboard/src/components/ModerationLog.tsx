@@ -88,7 +88,7 @@ export function ModerationLog({
       <ol className="space-y-3">
         {actions.length === 0 && <li className="text-sm text-neutral-600">Nothing logged yet.</li>}
         {visible.map((a) => {
-          const reversible = a.undo !== null && a.undo !== undefined && a.status === 'executed' && !a.overridden;
+          const reversible = a.reversible;
           return (
             <li key={a.id} className="rounded border border-neutral-800 bg-neutral-950/50 p-3">
               <div className="flex flex-wrap items-center gap-2">

@@ -19,6 +19,7 @@ import {
   getHealth,
   getMembers,
   getUnprompted,
+  ago,
   type ActionRow,
   type Cognition,
   type Health,
@@ -114,9 +115,12 @@ export default function Page() {
             {health?.mode === 'api-only' && (
               <span
                 className="rounded border border-sky-900 bg-sky-950 px-2 py-1 text-sky-400"
-                title="This connector serves the mirror and the API, but is not running the Telegram bot"
+                title="This connector serves the mirror and the API, but is not running the Telegram bot — so this data is a snapshot, not a live feed"
               >
-                read-only mirror
+                mirror snapshot
+                {typeof health.dataAsOfMs === 'number' && (
+                  <> &middot; newest activity {ago(health.dataAsOfMs, nowMs)}</>
+                )}
               </span>
             )}
             <span className={`rounded border px-2 py-1 ${down ? 'border-rose-900 bg-rose-950 text-rose-400' : 'border-emerald-900 bg-emerald-950 text-emerald-400'}`}>
@@ -129,6 +133,11 @@ export default function Page() {
           a <span className="text-neutral-200">Mind</span>, not in this dashboard and not in the
           connector&rsquo;s database. Everything below is read back out of it. Delete the database and
           Keeper still knows everyone.
+        </p>
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-neutral-500">
+          The community is a fictional cast in a private group. Real people can still join one, so
+          any real account here is <span className="text-neutral-400">pseudonymised</span> and its
+          messages withheld &mdash; what Keeper did is public, who they are is not.
         </p>
       </header>
 

@@ -23,6 +23,8 @@ export interface Recall {
 
 export interface Member {
   telegramId: number;
+  /** True when this row stands in for a real person. The dashboard says so out loud. */
+  pseudonymous?: boolean;
   handle: string | null;
   display: string;
   firstSeenMs: number;
@@ -57,7 +59,12 @@ export interface ActionRow {
   overridden: boolean;
   overrideNote: string | null;
   overriddenAtMs: number | null;
-  undo: unknown;
+  /**
+   * Whether an undo APPLIES — deliberately not the plan itself. The API withholds undo plans,
+   * posted message ids and chat ids: they are the coordinates of a private group and the
+   * dashboard never needed them to draw a button.
+   */
+  reversible: boolean;
   tsMs: number;
 }
 
@@ -68,6 +75,8 @@ export interface Health {
   budget: { spentToday: number; dailyBudget: number };
   /** 'api-only' means the Telegram bot is not running here, so undo is unavailable. */
   mode?: 'full' | 'api-only';
+  /** Timestamp of the newest logged action. In api-only this is when the snapshot stops. */
+  dataAsOfMs?: number | null;
   writesEnabled: boolean;
   serverTime: string;
 }
