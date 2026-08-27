@@ -218,6 +218,21 @@ Three tools, one refusal, at the **equip** step rather than execution. The Mind 
 the US$10 purchase is visible to it and the gate still did not lift. Nothing about this is
 reachable from our code: no value can move from a Mind on this account today.
 
+**A SECOND US$10 purchase did not lift it either (LIVE-VERIFIED 2026-08-28 00:14 HKT).** The
+gate was re-tested after a second cognition purchase, this time made on the Steward Mind's own
+top-up link. The Rewards Mind reported the equip attempt verbatim:
+
+> "Did the equip succeed? **No.** Exact response (verbatim): *'You are not allowed to equip
+> this tool until your steward has paid for cognition beyond any initial free cognition
+> credits.'* That is the identical wording as the previous attempt. The billing gate has not
+> lifted after the second $10 purchase... The only thing that changed is the billing ledger on
+> the steward side, which has not yet satisfied whatever condition the gate is keyed off of."
+
+Two purchases, three tools, identical refusal. Whatever the gate is keyed to, it is not
+per-Mind credit balance and not cumulative spend — both Minds are funded (Steward 612 staged,
+Rewards 609) and both wallets hold ETH on Base. **Treat on-chain execution as unavailable on
+this account and stop spending money on it.**
+
 **What the wallet CAN do today**, per the same answer: read its native balance, read ERC-20
 transfers and prices, and `MENTE_SendToMind` — send MENTE gas-free to other Minds. Everything
 that signs and broadcasts a transaction — native transfers, ERC-20 transfers, swaps, raw tx,
