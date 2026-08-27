@@ -1,0 +1,18 @@
+/* Keeper — design tokens.
+ *
+ * The palette is not a mood board. --warm is the Mind's own token for `warmth: warm`, the
+ * relationship state Keeper exists to produce; --steady, --cooling and --at-risk are the other
+ * three ratings it assigns. They appear ONLY where that rating is literally true. */
+:root {
+  --void:   #0B0A08;  /* background — warm near-black, archive in shadow, not dark mode */
+  --paper:  #F2EFE9;  /* primary text — warm, faintly aged. never #FFF */
+  --mute:   #8A8578;  /* labels, metadata, rules */
+  --warm:   #F59E0B;  /* THE accent */
+
+  --steady:  #38BDF8;
+  --cooling: #A78BFA;
+  --at-risk: #F43F5E;
+
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-io:   cubic-bezier(0.65, 0, 0.35, 1);
+}

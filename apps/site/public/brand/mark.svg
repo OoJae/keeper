@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Keeper">
+  <title>Keeper — an open loop</title>
+  <!-- The ring, opened at the upper right. Two terminals reach PAST each other rather than
+       meeting: the thread is picked back up, not tied off. -->
+  <path d="M31.5 8.6a17 17 0 1 1-15 0" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- The returning end, overshooting the start. This is the whole idea in one stroke. -->
+  <path d="M24 3.4c4.9 0 8.7 2.4 10.4 5.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

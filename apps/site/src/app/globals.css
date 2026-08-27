@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Keeper — design tokens. The palette is not a mood board: --warm is the Mind's OWN token for
+ * `warmth: warm`, the relationship state Keeper exists to produce. The other three ratings
+ * appear only where that rating is literally true. */
+:root {
+  --void: #0B0A08;
+  --paper: #F2EFE9;
+  --mute: #8A8578;
+  --warm: #F59E0B;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  color-scheme: dark;
+}
+
+html { -webkit-font-smoothing: antialiased; }
+
+body {
+  background: var(--void);
+  color: var(--paper);
+  font-family: var(--font-body), system-ui, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+/* ── The fluid scale. Line-height tightens as size grows; tracking opens as it shrinks. ── */
+.t-hero    { font-size: clamp(3rem, 11vw, 11rem);      line-height: 0.9;  letter-spacing: -0.035em; }
+.t-section { font-size: clamp(2rem, 4.5vw, 4.5rem);    line-height: 1.0;  letter-spacing: -0.025em; }
+.t-quote   { font-size: clamp(1.3rem, 2.5vw, 2.4rem);  line-height: 1.3;  letter-spacing: -0.015em; }
+.t-body    { font-size: clamp(1rem, 1.05vw, 1.15rem);  line-height: 1.6; }
+.t-label   { font-size: 0.7rem; line-height: 1; letter-spacing: 0.14em; text-transform: uppercase; }
+
+/* The two voices. Serif is what the Mind SAID; mono is what the system RECORDED. */
+.voice-mind   { font-family: var(--font-display), Georgia, serif; }
+.voice-record { font-family: var(--font-mono), ui-monospace, monospace; }
+
+/* ── Reveals: masked lines, fired once. ───────────────────────────────────────────────── */
+.reveal { overflow: hidden; }
+.reveal > * {
+  transform: translateY(105%);
+  opacity: 0;
+  transition:
+    transform 0.95s var(--ease-out) var(--reveal-delay, 0s),
+    opacity   0.7s  var(--ease-out) var(--reveal-delay, 0s);
+}
+.reveal[data-shown='true'] > * { transform: translateY(0); opacity: 1; }
+
+.fade { opacity: 0; transition: opacity 0.9s var(--ease-out) var(--reveal-delay, 0s); }
+.fade[data-shown='true'] { opacity: 1; }
+
+/* ── Film. A single grain layer at 4%, and a soft warm wash from the floor. ───────────── */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: -50%;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Focus: visible, and in the accent so it reads as intentional. ────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--warm);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+::selection { background: var(--warm); color: var(--void); }
+
+/* ── Reduced motion: the corridor collapses to a static stack, reveals become instant. ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal > *, .fade { transform: none !important; opacity: 1 !important; }
+}
