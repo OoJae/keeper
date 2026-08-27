@@ -159,6 +159,15 @@ export function createScrubber(members: readonly MemberSnapshot[]): TextScrubber
     }
     if (m.display.length >= 5) {
       rules.push({ re: new RegExp(`\\b${escapeRe(m.display)}\\b`, 'g'), to: `member_${tag}` });
+    } else if (m.display !== '') {
+      // A short display name is left alone in ordinary prose (mangling every "lol" would corrupt
+      // the log), but the Mind writes it in one unmistakable shape — display:'Lol' — and there it
+      // is unambiguously the person's name rather than a word someone typed. Scrub that form
+      // specifically: precise where a bare word match would not be.
+      rules.push({
+        re: new RegExp(`display:\\s*(['"\`])${escapeRe(m.display)}\\1`, 'gi'),
+        to: `display:'member_${tag}'`,
+      });
     }
   }
   if (rules.length === 0) return (t) => t;

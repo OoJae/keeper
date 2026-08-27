@@ -196,7 +196,22 @@ describe('free text written by the Mind is scrubbed too', () => {
     expect(JSON.stringify(members)).not.toContain(String(REAL_HUMAN));
   });
 
-  it('leaves short display names alone, on purpose', async () => {
+  it("scrubs a short display name where the Mind writes it as display:'X'", async () => {
+    // The bare word is left alone, but this shape is unambiguous, and it is how the leak
+    // actually appeared on the live dashboard.
+    mirror.recordAction({
+      eventId: null, action: 'reply', originalAction: 'reply',
+      reasoning: `member joined (id:${REAL_HUMAN}, display:'Lol') at 01:17`,
+      confidence: 'high', gated: false, warnings: [], status: 'executed',
+      detail: '', rawReply: '', tsMs: NOW,
+    });
+    const { actions } = await get('/api/actions');
+    const row = actions.find((a: any) => a.reasoning.includes('at 01:17'));
+    expect(row.reasoning).not.toContain("display:'Lol'");
+    expect(row.reasoning).toMatch(/display:'member_[a-z0-9]+'/);
+  });
+
+  it('leaves short display names alone in ordinary prose, on purpose', async () => {
     // "Lol" is 3 characters and collides with ordinary English; mangling every "lol" in a chat
     // log to protect a string that identifies nobody would corrupt the evidence. Documented
     // limit, asserted so it stays a decision rather than drifting into a bug.
