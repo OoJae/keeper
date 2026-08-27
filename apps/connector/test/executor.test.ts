@@ -249,7 +249,7 @@ describe('Telegram physics', () => {
 });
 
 describe('stubs are honest', () => {
-  it('flags rather than silently swallowing mute and reward', async () => {
+  it('flags rather than silently swallowing a mute', async () => {
     const muted = await run(
       { action: 'mute', target_member: '@rex_hotkeys', reasoning: 'r', confidence: 'high' },
       [],
@@ -257,18 +257,32 @@ describe('stubs are honest', () => {
     expect(muted.converted).toBe('mute_not_implemented');
     expect(muted.action).toBe('flag_creator');
     expect(surface.restricted).toHaveLength(0);
+  });
 
+  /**
+   * Descope Plan A. Every value-moving tool on the platform is behind a billing gate a paid
+   * top-up did not lift, so the payout is a human step — but what reaches the creator has to
+   * read as the nomination it is, carrying who and why, not as a stub apologising.
+   */
+  it('turns a reward into a nomination the creator can act on', async () => {
     const rewarded = await run(
       {
         action: 'reward',
         target_member: '@marco_cuts',
-        reward: { type: 'top_contributor', note: 'export cheat sheet' },
+        reward: { type: 'top_contributor', note: 'wrote the export cheat sheet' },
         reasoning: 'r',
         confidence: 'high',
       },
       [],
     );
-    expect(rewarded.converted).toBe('reward_not_implemented');
+    expect(rewarded.converted).toBe('reward_needs_human');
+    expect(rewarded.action).toBe('flag_creator');
+
+    const dm = surface.directMessages[0]?.html ?? '';
+    expect(dm).toContain('@marco_cuts');
+    expect(dm).toContain('top contributor');
+    expect(dm).toContain('wrote the export cheat sheet');
+    expect(dm).not.toMatch(/did not act|not_implemented/);
   });
 });
 

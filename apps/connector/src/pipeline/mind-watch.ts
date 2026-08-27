@@ -31,8 +31,16 @@ const CURSOR_KEY = 'mind_watch_cursor';
 const FLOOR_KEY = 'mind_watch_floor_ms';
 const CLAIMED_KEY = 'mind_watch_claimed';
 
-/** Actions that must never fire without a message to anchor them to. */
-const DESTRUCTIVE = new Set(['delete', 'mute', 'warn', 'reward']);
+/**
+ * Actions that must never fire without a message to anchor them to.
+ *
+ * A reward is deliberately absent. An autonomous nomination has no triggering message by
+ * definition — that is precisely what makes it autonomous — and it cannot act on its own
+ * regardless, because the executor routes every reward to the creator for approval
+ * (Descope Plan A). Downgrading it here as well only swaps the recommendation the creator
+ * should read for a complaint about a missing anchor.
+ */
+const DESTRUCTIVE = new Set(['delete', 'mute', 'warn']);
 
 export interface MindWatcherDeps {
   readonly transport: Pick<MindTransport, 'getHistory'>;

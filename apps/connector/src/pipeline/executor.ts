@@ -118,9 +118,32 @@ function directiveTarget(d: KeeperDirective): string | null {
   return 'target_member' in d && typeof d.target_member === 'string' ? d.target_member : null;
 }
 
+function directiveReward(d: KeeperDirective): { type?: string; note?: string } | null {
+  if (!('reward' in d) || typeof d.reward !== 'object' || d.reward === null) return null;
+  return d.reward as { type?: string; note?: string };
+}
+
+/**
+ * Descope Plan A (BUILD_PLAN §12): the payout needs a human, but the judgement behind it
+ * does not. So a reward reaches the creator the way a colleague would send it — who, why,
+ * and a question — rather than as a report that Keeper declined to do something. The Mind
+ * still did the part only a Mind could: it picked the person out of its own memory.
+ */
+function rewardRecommendation(d: KeeperDirective, target: string | null, body: string): string {
+  const reward = directiveReward(d);
+  const kind = reward?.type === undefined || reward.type === '' ? 'a reward' : reward.type.replace(/_/g, ' ');
+  const note = reward?.note ?? d.reasoning;
+  const parts = [`Keeper nominates ${target ?? 'a member'} for ${kind}.`];
+  if (note !== undefined && note !== '') parts.push(note);
+  if (body !== '') parts.push(`Suggested announcement: ${body}`);
+  parts.push('Send it? Nothing goes out until you say so.');
+  return parts.join(' ');
+}
+
 /**
  * Rewrites any directive into a creator flag carrying the Mind's own reasoning. Used for
- * every refusal path so the creator always hears about the thing we would not do.
+ * every refusal path so the creator always hears about the thing we would not do — and for
+ * the one path that is not a refusal at all, where the wording changes to match.
  */
 function asFlag(d: KeeperDirective, why: string): KeeperDirective {
   const body = directiveMessage(d);
@@ -128,7 +151,10 @@ function asFlag(d: KeeperDirective, why: string): KeeperDirective {
   return {
     action: 'flag_creator',
     ...(target === null ? {} : { target_member: target }),
-    message: `Keeper did not act on a "${d.action}" directive (${why}).${body === '' ? '' : ` Mind's text: ${body}`}`,
+    message:
+      why === 'reward_needs_human'
+        ? rewardRecommendation(d, target, body)
+        : `Keeper did not act on a "${d.action}" directive (${why}).${body === '' ? '' : ` Mind's text: ${body}`}`,
     reasoning: d.reasoning,
     confidence: d.confidence,
   };
@@ -188,10 +214,20 @@ export async function executeDirective(
     if (check !== null) rewrite(check);
   }
 
-  // 3. Stubs. Phase 5 owns rewards; muting is deliberately not automated yet — both log
-  //    and flag rather than silently doing nothing (BUILD_PLAN §1.7: human stays in charge).
-  if (current.action === 'mute' || current.action === 'reward') {
-    rewrite(`${current.action}_not_implemented`);
+  // 3. Muting is deliberately not automated: it is the one moderation action with no cheap
+  //    undo, so it logs and flags rather than silently doing nothing (BUILD_PLAN §1.7).
+  if (current.action === 'mute') {
+    rewrite('mute_not_implemented');
+  }
+
+  // 3b. Rewards route to the creator by design, not by omission (Descope Plan A, §12).
+  //     Every value-moving tool on this platform — WALLET_TransferNative,
+  //     WALLET_TransferErc20, MENTE_SendToMind — is shut behind a billing gate that a paid
+  //     top-up did not lift (API-NOTES, 2026-08-27), so a Mind on this account cannot move
+  //     value at all. The Mind still does the part that needed a Mind: it decides *who*
+  //     earned it, from its own relationship memory, and says why. A human presses send.
+  if (current.action === 'reward') {
+    rewrite('reward_needs_human');
   }
 
   switch (current.action) {

@@ -44,6 +44,19 @@ const USAGE = [
 ].join('\n');
 
 /**
+ * Conversions that are a design decision rather than a refusal, and the sentence `/keeper why`
+ * should show instead. Keeping the wording here — not at the rewrite site — means the executor
+ * stays a policy engine and the phrasing lives with the rest of what Keeper says out loud.
+ */
+const BY_DESIGN_CONVERSIONS = new Map<string, string>([
+  [
+    'reward_needs_human',
+    'Rewards are recommendations: it decides who earned one from what it remembers, you press send.',
+  ],
+  ['mute_not_implemented', 'Muting is the one action with no easy undo, so it comes to you first.'],
+]);
+
+/**
  * One refusal per member per window. In-memory on purpose: a restart forgetting who was
  * told is harmless, and a table for this would be state the mirror does not need.
  */
@@ -236,7 +249,15 @@ function formatWhy(last: {
     lines.push('Gated: low confidence, so I flagged you instead of acting.');
   }
   if (last.converted !== null) {
-    lines.push(html`Rewritten: the Mind asked for <b>${last.originalAction}</b>; I refused (${last.converted}).`);
+    // Two different things wear the same field. Most conversions are a refusal — the Mind
+    // asked for something it was not allowed to have. A few are routing decisions we made
+    // on purpose, and calling those "refused" misreads Keeper's own log to its creator.
+    const byDesign = BY_DESIGN_CONVERSIONS.get(last.converted);
+    lines.push(
+      byDesign === undefined
+        ? html`Rewritten: the Mind asked for <b>${last.originalAction}</b>; I refused (${last.converted}).`
+        : html`Routed to you: the Mind asked for <b>${last.originalAction}</b>. ${byDesign}`,
+    );
   }
   if (last.warnings.length > 0) lines.push(html`Parser warnings: ${last.warnings.join(', ')}`);
   if (last.overridden) lines.push('You have already overridden this one.');
