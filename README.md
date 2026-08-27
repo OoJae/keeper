@@ -66,22 +66,49 @@ Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
 ## Repo layout
 
 ```
-apps/connector    Telegram bot (grammY), event router, directive executor, SQLite mirror
-apps/dashboard    Next.js dashboard (Phase 6)
+apps/connector    Telegram bot (grammY), event router, directive executor, SQLite mirror,
+                  and the dashboard API (src/api/) incl. the public-view redaction layer
+apps/dashboard    Next.js dashboard — relationship graph, member timelines, moderation log
 apps/seeder       Demo cast + dated event replay + scenario runner
 packages/protocol Member Identity Envelope + KEEPER-ACTION directive (zod, tested)
 packages/minds-client  Adapter over the Minds Messaging API (+ fallback transport)
-docs/             Build plan, strategy, verified API notes, evidence
+docs/             Build plan, architecture, verified API notes, audit, evidence
 ```
 
 ## Quickstart
 
+Node 20+ and pnpm. Nothing below needs a Telegram group or a Minds key except where it says so.
+
 ```bash
 pnpm install
-cp .env.example .env      # fill in — see the comments in that file
-pnpm test                 # protocol unit tests
-pnpm spike:api-smoke      # verify the Minds API end-to-end with your key
+pnpm test          # 283 unit tests — no key, no network, no group needed
+pnpm typecheck
 ```
+
+To run it against your own Mind and community:
+
+```bash
+cp .env.example .env      # every key is documented in there
+pnpm spike:api-smoke      # proves your key, the transport and a real Mind reply end-to-end
+pnpm teach:charter        # teach the Steward Mind its role (docs/STEWARD-CHARTER.md, verbatim)
+pnpm dev:connector        # the bot + the dashboard API on :4000
+```
+
+Then, in a second terminal:
+
+```bash
+pnpm dashboard:recall     # ask the Mind what it remembers about each member (25–200s each)
+pnpm dev:dashboard        # http://localhost:3000
+```
+
+**On the API.** Read endpoints are public by design — the moderation log is meant to be looked
+at — and real accounts are pseudonymised before anything leaves the process
+(`apps/connector/src/api/redact.ts`). The single write, `POST /api/actions/:id/undo`, needs
+`KEEPER_ADMIN_TOKEN`. **Leave that unset and writes are refused outright**: the safe state is the
+default rather than something to remember to switch on. `/keeper undo` in Telegram works either
+way.
+
+Useful while running: `/keeper status`, `/keeper why`, `/keeper undo`, `/keeper pause`.
 
 ## Documentation
 
@@ -89,6 +116,9 @@ pnpm spike:api-smoke      # verify the Minds API end-to-end with your key
 - [docs/STRATEGY.md](docs/STRATEGY.md) — why Keeper, and why this track
 - [docs/API-NOTES.md](docs/API-NOTES.md) — **verified** Minds platform behavior
 - [docs/TASKS.md](docs/TASKS.md) — live task tracker
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, deployment topology, redaction boundary
+- [docs/AUDIT.md](docs/AUDIT.md) — adversarial review: what was found, fixed, and left
+- [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md) — the shooting script, grounded in real timestamps
 
 ## Note on the demo community
 
