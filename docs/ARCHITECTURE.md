@@ -38,6 +38,52 @@ system.** Everything below follows from refusing to put relationship memory in a
 └──────────────────────┘
 ```
 
+## Deployment: one bot, two hosts
+
+```
+  Vercel                          Railway                        your machine
+  ──────                          ───────                        ────────────
+  apps/dashboard  ──HTTPS──▶  connector (api-only)          connector (full)
+  public, read-only           mirror + JSON API             THE BOT LIVES HERE
+                              NO Telegram poll              Telegram long-poll
+                              volume: /app/var              var/keeper.db
+```
+
+**The bot is a singleton and that shapes everything.** It holds a Telegram long-poll, so two
+instances split updates unpredictably between them — measured, not theoretical: a stale process
+did it on 2026-08-27 and cost 25 conflicts. So the deployed connector runs `KEEPER_MODE=api-only`:
+it serves the mirror and the dashboard API but never starts the bot. The public dashboard is a
+**window** onto a live system, not a second copy of it, and it says so on the page.
+
+Consequences worth stating plainly:
+
+- The deployed mirror is a **snapshot**, seeded at deploy time. `/api/health` publishes
+  `dataAsOfMs` so the dashboard can show its age rather than imply a live feed.
+- **Undo is unavailable there** and refuses with that reason — reversing an action needs the bot
+  that posted it. `/keeper undo` in Telegram remains the real control surface.
+- Promoting the deployment to the live bot is a *cutover*, not an addition: set `KEEPER_MODE=full`
+  and stop the local connector, never both.
+
+## What the public API is allowed to say
+
+`apps/connector/src/api/redact.ts`. Reads are public — a judge must be able to open the moderation
+log without a credential — so the boundary is about content, not authentication.
+
+- **Real accounts are pseudonymised, not deleted.** The cast is fictional, but real people can
+  join a real Telegram group, and one did. Deleting the row would delete the evidence that Keeper
+  welcomed a newcomer and checked in the next day, so the row survives and the person does not.
+  Real ids map one-way to a stable synthetic id; a lookup by the real id is refused.
+- **The Mind's prose is scrubbed, not just the fields.** Redacting structured columns still leaked
+  a real id five times, because the Mind writes *about* people and that prose is the log's whole
+  value. Free text is scrubbed everywhere it appears — including a fictional member's summary that
+  names the real one.
+- **Operational internals are never published**: the Mind's raw reply, undo plans, chat ids,
+  posted message ids. The dashboard receives a `reversible` boolean, which is all a button needed.
+
+The one write — `POST /api/actions/:id/undo` — requires `KEEPER_ADMIN_TOKEN`, compared in constant
+time, with backoff after repeated failures. With no token configured, writes are refused outright:
+the safe state is the default, not something to remember to switch on.
+
 ## Why the Mind is not optional here
 
 A judge's fair question is "isn't this just a database with an LLM on top?" The answer has

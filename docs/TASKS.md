@@ -68,10 +68,11 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       in-group ping on the 403 you get until the creator has `/start`ed the bot).
       `mute`/`reward` are honest stubs: they log and flag rather than silently no-op.
 - [x] SQLite mirror: members, events, actions tables (+ settings, for the pause switch)
-- [ ] **Accept:** group message → context-aware reply end-to-end; log shows reasoning
-      — blocked on the demo group + bot token existing. **The "< ~15s" half of this
-      criterion is void**: measured Mind latency is 23–65s (docs/API-NOTES.md), so the
-      handler returns immediately and the exchange runs on a per-chat queue instead.
+- [x] **Accept: PASSED 2026-08-28 00:26 HKT** — Lena's return was exactly this criterion end to
+      end: group message → envelope → Mind → directive → posted reply, with the Mind's reasoning
+      in the log (action 67). **The "< ~15s" half is void**: measured latency is 23-200s
+      (docs/API-NOTES.md), so the handler returns immediately and the exchange runs on a per-chat
+      queue. Evidence: docs/EVIDENCE/returning-member.md
 
 ## Phase 2 — Teach Keeper the community (Aug 22)
 - [x] Write `docs/STEWARD-CHARTER.md` (6 messages + a gradeable 10-row judgment test)
@@ -178,8 +179,9 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [ ] Re-run all Phase 0 spikes (regression canaries against the beta platform) — Aug 26
 
 ## Phase 8 — Docs + submission (Aug 26–27)
-- [ ] `docs/ARCHITECTURE.md`
-- [ ] `docs/MINDS-INTEGRATION.md` — rubric word → feature → code path → screenshot
-- [ ] README: pitch, problem, 3 bullets, diagram, "why this needs a Mind", links, quickstart
+- [x] `docs/ARCHITECTURE.md` — incl. the deployment topology and the public-API redaction boundary
+- [x] `docs/MINDS-INTEGRATION.md` — rubric word → feature → code path → evidence, negatives included
+- [x] README: pitch, working/not-working split with evidence links, live URLs, quickstart
+- [x] `docs/AUDIT.md` — adversarial review of the whole system, findings and fixes
 - [ ] Repo public; no secrets in history; fresh-clone quickstart tested
 - [ ] DoraHacks BUIDL submitted (**Aug 27**) with student status stated; confirmation saved
