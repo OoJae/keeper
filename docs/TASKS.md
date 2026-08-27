@@ -85,17 +85,22 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       the open loop without hedging, #9 spam deleted at high confidence)
 
 ## Phase 3 — Persistence features (Aug 22–23)
-- [x] Memory — returning-member recognition implemented and unit-tested to the ms.
-      LIVE evidence pending Lena's return (earliest 2026-08-27 20:07 HKT — a real 48h gap)
-- [x] Continuity — the Mind holds Lena's export loop and says so unprompted when asked.
-      In-group evidence lands with her return.
+- [x] Memory — returning-member recognition **FIRED LIVE 2026-08-28 00:26:17 HKT** after a real
+      52h19m gap. Event 59 `member_returned`, action 67 `reply`/high/executed, 77.9s.
+      Evidence: docs/EVIDENCE/returning-member.md
+- [x] Continuity — **LIVE**. Keeper resumed the proxy walkthrough by name and re-asked both
+      unanswered questions, from a vague "still getting that stutter". Also verified cold from a
+      never-used conversation: docs/EVIDENCE/memory-continuity.md
 - [x] Autonomy #1 — digest FIRED NATIVELY 2026-08-25 ("on my own initiative, no re-asking").
       docs/EVIDENCE/autonomy-digest.md. A clean one still to capture (`/keeper digest`).
 - [x] Autonomy #2 — welcome fires on join (evidenced 2026-08-26, @quietfox).
       CheckinScheduler built and tested; its check-in is due 2026-08-27.
 - [x] Autonomy #3 — all three digest paths ask for who has gone quiet, and no code computes
       it (asserted by test). Read it out of the clean digest.
-- [ ] **Accept:** all five fired with real timestamps, screenshotted into `docs/EVIDENCE/`
+- [x] **Accept: PASSED 2026-08-28.** All five behaviours have fired with real timestamps —
+      returning-member (returning-member.md), continuity (memory-continuity.md), digest
+      (autonomy-digest.md, digest-clean.md), welcome + day-2 check-in (2026-08-26/27),
+      at-risk radar (digest-clean.md). **Phase 3 closed.**
 
 ## Phase 4 — Human override + moderation log (Aug 23)
 - [x] `/keeper pause`, `/keeper resume`, `/keeper undo`, `/keeper why` (plus `/keeper status`
