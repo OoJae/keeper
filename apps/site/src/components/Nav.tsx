@@ -6,6 +6,7 @@
  */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const LINKS = [
   { href: '/proof', label: 'Proof' },
@@ -16,11 +17,43 @@ const LINKS = [
 
 export function Nav() {
   const path = usePathname();
+  const [scrolled, setScrolled] = useState(false);
+
+  // Once the page has moved, the bar becomes opaque. A gradient scrim alone was not enough: the
+  // display type is 90px of near-white and it read straight through, leaving the one element
+  // that is on screen the whole time as the least legible thing on it.
+  useEffect(() => {
+    const onScroll = (): void => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="fixed inset-x-0 top-0 z-50 mix-blend-difference">
+    <header className="fixed inset-x-0 top-0 z-50">
+      {/*
+        A scrim, not mix-blend-difference. Difference blending looked elegant over the corridor's
+        near-black and then went almost invisible the moment the nav crossed the hero's near-white
+        display type — which it does on every page. A soft gradient is less clever and always
+        legible, which is the correct trade for the one element that is on screen the whole time.
+      */}
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 border-b transition-[opacity,border-color] duration-500 ease-io ${
+          scrolled ? 'border-paper/10 opacity-100' : 'border-transparent opacity-0'
+        }`}
+        style={{ background: 'rgba(11,10,8,0.86)', backdropFilter: 'blur(14px)' }}
+      />
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-0 top-0 h-28 transition-opacity duration-500 ease-io ${
+          scrolled ? 'opacity-0' : 'opacity-100'
+        }`}
+        style={{ background: 'linear-gradient(to bottom, rgba(11,10,8,0.75), rgba(11,10,8,0))' }}
+      />
       <nav
         aria-label="Primary"
-        className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-5 py-5 md:px-10 md:py-6"
+        className="relative mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-5 py-5 md:px-10 md:py-6"
       >
         <Link href="/" className="group flex items-center gap-3" aria-label="Keeper — home">
           <svg viewBox="0 0 48 48" fill="none" className="h-5 w-5 text-paper" aria-hidden="true">
