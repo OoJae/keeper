@@ -187,6 +187,36 @@ funded, Phase 5 cannot run at all, and the §12 descope trigger (Aug 24 EOD) app
 
 ---
 
+## The wallet billing gate is NOT cleared by a top-up (LIVE-VERIFIED 2026-08-27) ⚠️
+
+Phase 0 recorded that `WALLET_TransferNative` was *"gated on this mind having been topped up
+with paid cognition credits beyond the free tier"*. The Rewards Mind now holds **613 staged
+credits and 0.00114 ETH on Base** — funded on both axes — and the gate is still shut. Asked
+directly, it quoted the platform's own refusal:
+
+> "The tool catalog confirms WALLET_TransferNative exists and is not in my equipped set, and
+> the equip call returns an explicit gate: *'You are not allowed to equip this tool until your
+> steward has paid for cognition beyond any initial free cognition credits.'* That's the block
+> — it's a steward-billing gate, not a configuration error I can work around."
+
+So a one-time top-up does not satisfy it. The wording says *steward has paid*, which points at
+an **account-level billing state** (plausibly the US$10/mo subscription rather than a one-time
+purchase), not per-Mind balance. Unresolved, and not resolvable from our side.
+
+**What the wallet CAN do today**, per the same answer: read its native balance, read ERC-20
+transfers and prices, and `MENTE_SendToMind` — send MENTE gas-free to other Minds. Everything
+that signs and broadcasts a transaction — native transfers, ERC-20 transfers, swaps, raw tx,
+contract writes — is behind the gate.
+
+Also newly visible: the Rewards wallet holds **1,173.98 MOCA (ERC-20)** at the same address.
+
+**Consequence for BUILD_PLAN Phase 5.** An on-chain reward *to a community member* is not
+achievable: the only value-moving capability available targets **Minds**, not arbitrary
+addresses, and members have no wallet in our schema anyway. This is the §12 descope trigger
+firing on evidence rather than on the calendar.
+
+---
+
 ## Mind↔Mind CIRCLES DO WORK via the API (LIVE-VERIFIED 2026-08-26) ✅
 
 The baseline above says the Circles endpoints "manage **human** collaborators by email" and
