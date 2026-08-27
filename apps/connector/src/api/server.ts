@@ -249,7 +249,9 @@ export function createApi(deps: ApiDeps): {
     const server = createServer((req, res) => {
       void handle(req, res);
     });
-    server.listen(deps.config.apiPort, () => {
+    // 0.0.0.0, not the default: inside a container, binding loopback makes the service
+    // unreachable from the platform's proxy and presents as a healthcheck that never passes.
+    server.listen(deps.config.apiPort, '0.0.0.0', () => {
       log.info('api_started', {
         port: deps.config.apiPort,
         origin: deps.config.dashboardOrigin,

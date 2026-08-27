@@ -245,7 +245,11 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('digestArmLeadMs', 'KEEPER_DIGEST_ARM_LEAD_MS');
   put('digestCutoffMs', 'KEEPER_DIGEST_CUTOFF_MS');
   put('checkinAtMinutes', 'KEEPER_CHECKIN_AT_MINUTES');
+  // Railway (and most PaaS) inject PORT and route the public domain to it. KEEPER_API_PORT
+  // still wins when set, so local dev is unaffected and a platform default does not silently
+  // override an explicit choice.
   put('apiPort', 'KEEPER_API_PORT');
+  if (raw.apiPort === undefined) put('apiPort', 'PORT');
   put('apiAdminToken', 'KEEPER_ADMIN_TOKEN');
   put('dashboardOrigin', 'KEEPER_DASHBOARD_ORIGIN');
   put('mode', 'KEEPER_MODE');

@@ -37,10 +37,16 @@ COPY tsconfig.json tsconfig.base.json ./
 # Fail the BUILD on a type error rather than the container at boot.
 RUN pnpm exec tsc --build
 
-# The mirror and the Minds conversation state must outlive a redeploy: mount a volume here.
-# Losing var/ loses the moderation log and the audit trail the whole demo rests on.
+# The mirror and the Minds conversation state must outlive a redeploy, so /app/var is a mounted
+# volume. It is declared by the PLATFORM, not here: Railway rejects a Dockerfile VOLUME outright
+# ("docker VOLUME is not supported, use Railway Volumes"). Locally, bind-mount it yourself:
+#   docker run -v "$PWD/var:/app/var" …
+# Losing var/ loses the moderation log and the audit trail the demo rests on.
 ENV KEEPER_MIRROR_PATH=/app/var/keeper.db
-VOLUME ["/app/var"]
+
+COPY apps/connector/docker-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 4000
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["pnpm", "--filter", "@keeper/connector", "start"]
