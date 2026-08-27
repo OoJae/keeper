@@ -18,16 +18,15 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       ⚠️ this key was pasted into a chat transcript — **rotate before the repo goes public**
 - [ ] Register on DoraHacks for the Jam; request the **cognition boost** for Steward
 - [ ] Join the Creative Minds Telegram community + Open Campus hub; note office hours
-- [ ] Create the demo **supergroup** "Ada's Editing Lab"; add @KeeperBot as **admin**
-      (needs `can_delete_messages` + `can_restrict_members`)
-- [ ] `/start` the bot in DM as the creator account (required before it can DM digests)
-- [ ] Invent/confirm the cast (BUILD_PLAN §9) and post **Day 1 seeded history**
-      — real elapsed days start counting now
+- [x] Demo **supergroup** "Ada's Editing Lab" exists; @KeeperStewardBot is **administrator**
+      with `can_delete_messages` + `can_restrict_members` (verified against the Telegram API)
+- [x] Creator has `/start`ed the bot — digests arrive as DMs (7 unprompted actions on record)
+- [x] Cast confirmed and seeded history posted — 6 members, 36 events, across real elapsed days
+      from 2026-08-20. Every timestamp is Telegram's own; none was ever written by hand.
 - [x] Day scripts written through recording day (days 1-7, `apps/seeder/src/cast.ts`);
       `pnpm seed:day <n>` posts/prints them, `apps/seeder/README.md` covers how one
       builder drives six cast accounts and why timestamps are never faked
-- [ ] Post day 4 (Aug 23) · [ ] day 5 (Aug 24) · [ ] day 6 (Aug 25) · [ ] day 7 (Aug 26)
-      — ten minutes each, from the real cast accounts (`pnpm seed:day <n> --script`)
+- [x] Days posted through recording day. The history the demo scrolls through is real and dated.
 
 ### Spikes (run in order; results land in docs/API-NOTES.md)
 - [x] `pnpm spike:api-smoke` — **PASS 7/7**. `X-Api-Key` honoured. **Transport GO.**
@@ -37,7 +36,10 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       *assert* facts it filed as unconfirmed. ⇒ Phase 2 charter must fix this (API-NOTES)
 - [x] `pnpm spike:proactive` — **PASS**. Unprompted, server-dated message 74s past the
       deadline. **Native autonomy confirmed — not cron-faked.**
-- [ ] `pnpm spike:circle` — Steward ↔ Rewards relay round-trip
+- [x] Circle round-trip **verified, though not via this script**: the Circle was established over
+      the API (`POST /v1/circles/{mindId}` `{"emails":[…]}` → `action:"mind_added"`, both
+      directions) and the Rewards Mind answered on its own conversation in 46.5s. The spike
+      script's manual-introduction step turned out not to be the only route — see API-NOTES.
 - [x] `pnpm spike:wallet` — **FAIL WALLET_NO_ACTION (class MIND, transport unaffected)**.
       Wallet `0xAfE264…900d` on **Base** is real (balance independently confirmed via Base
       RPC), but `WALLET_TransferNative` is not equipped: gated on a paid cognition top-up
@@ -173,7 +175,10 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [x] `pnpm demo:run` stages every beat in order (`--dry-run` prints the run sheet
       offline; live mode preflights the bot/group/admin rights, then waits out the
       measured 23-66s Mind latency without ever triggering Keeper itself)
-- [ ] Voiceover scripted word-for-word (~260 words)
+- [x] Voiceover scripted word-for-word (258) — `docs/DEMO-SCRIPT.md`. Rewritten from BUILD_PLAN
+      §10, which had gone stale twice over: it staged Lena returning live (she already returned
+      for real on a 52h gap, so re-staging would be a re-enactment §8 forbids) and showed an
+      on-chain reward that does not exist. Every beat is now real, dated history.
 - [ ] Record segments, stitch, caption; 1.5–2:00 exactly
 - [ ] Raw uncut fallback take kept
 - [ ] Re-run all Phase 0 spikes (regression canaries against the beta platform) — Aug 26
@@ -183,5 +188,9 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [x] `docs/MINDS-INTEGRATION.md` — rubric word → feature → code path → evidence, negatives included
 - [x] README: pitch, working/not-working split with evidence links, live URLs, quickstart
 - [x] `docs/AUDIT.md` — adversarial review of the whole system, findings and fixes
-- [ ] Repo public; no secrets in history; fresh-clone quickstart tested
+- [x] **Fresh-clone quickstart TESTED** — cloned to a temp dir, `pnpm install`, `pnpm test`
+      (283 passed), `pnpm typecheck` (clean), dashboard built and served against the live API.
+      No `.env` in the clone; full-history sweep for secrets: 0.
+- [ ] Repo public — **blocked on rotating the Builder key** (pasted into a chat transcript; never
+      committed, so history is clean and publishing does not expose it, but rotate first anyway)
 - [ ] DoraHacks BUIDL submitted (**Aug 27**) with student status stated; confirmation saved
