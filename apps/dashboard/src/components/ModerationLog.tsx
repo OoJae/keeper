@@ -30,11 +30,14 @@ export function ModerationLog({
   actions,
   nowMs,
   token,
+  readOnlyReason = null,
   onUndone,
 }: {
   actions: ActionRow[];
   nowMs: number;
   token: string;
+  /** Set when undo is impossible here regardless of token — explained rather than just greyed. */
+  readOnlyReason?: string | null;
   onUndone: () => void;
 }) {
   const [busy, setBusy] = useState<number | null>(null);
@@ -76,6 +79,11 @@ export function ModerationLog({
           every row carries the Mind&rsquo;s own reasoning
         </p>
       </div>
+      {readOnlyReason !== null && (
+        <div className="mb-3 rounded border border-sky-900/60 bg-sky-950/20 p-2 text-xs text-sky-300">
+          {readOnlyReason}
+        </div>
+      )}
 
       <ol className="space-y-3">
         {actions.length === 0 && <li className="text-sm text-neutral-600">Nothing logged yet.</li>}
@@ -141,13 +149,20 @@ export function ModerationLog({
                     disabled={token === '' || busy === a.id}
                     onClick={() => void undo(a.id)}
                     title={
-                      token === ''
+                      readOnlyReason ??
+                      (token === ''
                         ? 'Undo needs the creator token — moderation control is not public'
-                        : 'Reverse this action in Telegram'
+                        : 'Reverse this action in Telegram')
                     }
                     className="ml-auto rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 transition hover:border-neutral-500 hover:text-neutral-100 disabled:cursor-not-allowed disabled:border-neutral-800 disabled:text-neutral-600"
                   >
-                    {busy === a.id ? 'undoing…' : token === '' ? 'undo (creator only)' : 'undo'}
+                    {busy === a.id
+                      ? 'undoing…'
+                      : readOnlyReason !== null
+                        ? 'undo (not here)'
+                        : token === ''
+                          ? 'undo (creator only)'
+                          : 'undo'}
                   </button>
                 )}
               </div>

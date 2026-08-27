@@ -193,3 +193,50 @@ describe('the one write is gated', () => {
     expect(surface.deleted).toHaveLength(0);
   });
 });
+
+
+describe('api-only mode', () => {
+  /**
+   * The mode a new deployment comes up in: mirror and API live, no Telegram poll, because the
+   * bot is a singleton and two pollers split updates between them. Undo must refuse clearly —
+   * a log that records an override which never reached Telegram is worse than no override.
+   */
+  it('serves reads but refuses undo, naming the reason', async () => {
+    const muteApi = createApi({
+      config: testConfig({ groupChatId: GROUP, apiAdminToken: TOKEN, mode: 'api-only' }),
+      mirror,
+      surface: null,
+      callLogPath: '/nonexistent/minds-calls.jsonl',
+      now: () => NOW,
+    });
+    mirror.touchMember({ telegramId: 555, handle: 'marco_cuts', display: 'Marco', tsMs: NOW, spoke: true });
+    const id = recordPosted(4242);
+
+    const drive = async (method: string, path: string, headers: Record<string, string> = {}) => {
+      let status = 0;
+      let payload = '';
+      await muteApi.handle(
+        { method, url: path, headers } as unknown as IncomingMessage,
+        {
+          setHeader: () => {},
+          writeHead(c: number) { status = c; return this; },
+          end(b?: string) { payload = b ?? ''; return this; },
+        } as unknown as ServerResponse,
+      );
+      return { status, body: payload === '' ? null : JSON.parse(payload) };
+    };
+
+    const health = await drive('GET', '/api/health');
+    expect(health.body.mode).toBe('api-only');
+    expect(health.body.writesEnabled).toBe(false);
+
+    const members = await drive('GET', '/api/members');
+    expect(members.body.members).toHaveLength(1);
+
+    const undone = await drive('POST', `/api/actions/${id}/undo`, { 'x-keeper-admin-token': TOKEN });
+    expect(undone.status).toBe(503);
+    expect(undone.body.error).toBe('no_telegram');
+    expect(surface.deleted).toHaveLength(0);
+    expect(mirror.getAction(id)?.overridden).toBe(false);
+  });
+});

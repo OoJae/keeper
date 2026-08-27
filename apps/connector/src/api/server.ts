@@ -26,7 +26,11 @@ import type { TelegramSurface } from '../telegram/surface.js';
 export interface ApiDeps {
   readonly config: ConnectorConfig;
   readonly mirror: Mirror;
-  readonly surface: TelegramSurface;
+  /**
+   * Null in api-only mode. Undo then refuses with that reason rather than reporting a reversal
+   * that never reached Telegram — a log that lies about an override is worse than no override.
+   */
+  readonly surface: TelegramSurface | null;
   /** Absolute path to var/minds-calls.jsonl, for the Cognition widget. */
   readonly callLogPath: string;
   readonly now?: () => number;
@@ -112,7 +116,8 @@ export function createApi(deps: ApiDeps): {
             spentToday: deps.mirror.routedCountBetween(fromMs, toMs),
             dailyBudget: deps.config.dailyMindBudget,
           },
-          writesEnabled: deps.config.apiAdminToken !== '',
+          mode: deps.config.mode,
+          writesEnabled: deps.config.apiAdminToken !== '' && deps.surface !== null,
           serverTime: new Date(now()).toISOString(),
         },
       };
@@ -176,6 +181,18 @@ export function createApi(deps: ApiDeps): {
       if (presented !== deps.config.apiAdminToken) {
         log.warn('api_undo_unauthorized', { path });
         return { status: 401, body: { error: 'unauthorized' } };
+      }
+
+      if (deps.surface === null) {
+        return {
+          status: 503,
+          body: {
+            error: 'no_telegram',
+            detail:
+              'This connector is running in api-only mode. Reversing an action needs the bot ' +
+              'that posted it — undo from Telegram with /keeper undo, or from the live connector.',
+          },
+        };
       }
 
       const id = Number(undoMatch[1]);

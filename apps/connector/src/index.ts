@@ -50,11 +50,24 @@ async function main(): Promise<void> {
     onError: (error, key) => log.error('queue_job_failed', { key, detail: error instanceof Error ? error.message : String(error) }),
   });
 
-  const runtime = await createConnector({ config, mirror, transport: minds.transport, queue });
+  // api-only comes up mute: mirror + dashboard API, no Telegram poll. The bot is a singleton,
+  // so a new deployment cannot be brought up beside the running one to be checked — it has to
+  // start silent, be seeded and verified, and only then take over.
+  const apiOnly = config.mode === 'api-only';
+  const runtime = apiOnly
+    ? null
+    : await createConnector({ config, mirror, transport: minds.transport, queue });
+  if (apiOnly) {
+    log.banner('API-ONLY MODE', [
+      'The Telegram bot is NOT running. Keeper is not watching the group and cannot act.',
+      'The mirror and the dashboard API are live; undo is unavailable without the bot.',
+      'Set KEEPER_MODE=full to take over as the live connector.',
+    ]);
+  }
 
   // Seeded history arrives by file, not by Telegram: a bot never receives its own posts,
   // so a relayed cast line is invisible to the bot API. Demo harness only.
-  const seedInbox = config.seedAttribution
+  const seedInbox = config.seedAttribution && runtime !== null
     ? new SeedInbox({
         path: resolve(ROOT, 'var/seed-inbox.jsonl'),
         router: runtime.router,
@@ -69,7 +82,9 @@ async function main(): Promise<void> {
   const api = createApi({
     config,
     mirror,
-    surface: runtime.surface,
+    // Null in api-only: undo needs the bot that posted the message, and the API refuses it
+    // with that reason rather than pretending to have reversed something.
+    surface: runtime?.surface ?? null,
     callLogPath: resolve(ROOT, 'var/minds-calls.jsonl'),
   });
   const apiServer = api.listen();
@@ -81,13 +96,12 @@ async function main(): Promise<void> {
     log.info('shutdown', { signal });
     // grammY finishes the update it is on, then stops polling; then we let queued Mind
     // exchanges finish so a half-executed directive never disappears silently.
-    void runtime
-      .stop()
+    void (runtime?.stop() ?? Promise.resolve())
       .catch((e: unknown) => log.error('shutdown_failed', { detail: e instanceof Error ? e.message : String(e) }))
       .finally(() => {
         seedInbox?.stop();
         apiServer?.close();
-        runtime.watcher.stop();
+        runtime?.watcher.stop();
         clearInterval(scheduleTimer);
         mirror.close();
         releaseLock();
@@ -97,20 +111,23 @@ async function main(): Promise<void> {
   process.once('SIGTERM', () => shutdown('SIGTERM'));
   process.once('SIGINT', () => shutdown('SIGINT'));
 
-  await runtime.start();
-  seedInbox?.start();
-  runtime.watcher.reconcileOnBoot();
-  runtime.watcher.start();
+  if (runtime !== null) {
+    await runtime.start();
+    seedInbox?.start();
+    runtime.watcher.reconcileOnBoot();
+    runtime.watcher.start();
+  }
   // One timer drives both: the watcher polls for what the Mind sent on its own, and the
   // digest scheduler decides whether tonight still needs arming or backstopping.
   const scheduleTimer = setInterval(() => {
-    runtime.digest.tick();
-    runtime.checkins.tick();
+    runtime?.digest.tick();
+    runtime?.checkins.tick();
   }, 60_000);
   scheduleTimer.unref?.();
-  runtime.digest.tick();
-  runtime.checkins.tick();
+  runtime?.digest.tick();
+  runtime?.checkins.tick();
   log.info('keeper_ready', {
+    mode: config.mode,
     group: config.groupName,
     chatId: config.groupChatId,
     alias: config.mindAlias,

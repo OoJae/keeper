@@ -111,6 +111,14 @@ export default function Page() {
                 paused by the creator
               </span>
             )}
+            {health?.mode === 'api-only' && (
+              <span
+                className="rounded border border-sky-900 bg-sky-950 px-2 py-1 text-sky-400"
+                title="This connector serves the mirror and the API, but is not running the Telegram bot"
+              >
+                read-only mirror
+              </span>
+            )}
             <span className={`rounded border px-2 py-1 ${down ? 'border-rose-900 bg-rose-950 text-rose-400' : 'border-emerald-900 bg-emerald-950 text-emerald-400'}`}>
               {down ? 'connector unreachable' : 'connector live'}
             </span>
@@ -148,7 +156,13 @@ export default function Page() {
         </div>
 
         <div className="lg:col-span-3">
-          <ModerationLog actions={actions} nowMs={nowMs} token={token} onUndone={() => void refresh()} />
+          <ModerationLog
+            actions={actions}
+            nowMs={nowMs}
+            token={health?.mode === 'api-only' ? '' : token}
+            readOnlyReason={health?.mode === 'api-only' ? 'This is a read-only mirror — the Telegram bot runs elsewhere, and reversing an action needs the bot that posted it.' : null}
+            onUndone={() => void refresh()}
+          />
         </div>
       </div>
 

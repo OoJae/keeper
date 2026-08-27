@@ -66,6 +66,8 @@ export interface Health {
   group: string;
   paused: boolean;
   budget: { spentToday: number; dailyBudget: number };
+  /** 'api-only' means the Telegram bot is not running here, so undo is unavailable. */
+  mode?: 'full' | 'api-only';
   writesEnabled: boolean;
   serverTime: string;
 }

@@ -76,6 +76,19 @@ export interface ConnectorConfig {
    * a wildcard would let any page a creator visits reach a localhost connector.
    */
   dashboardOrigin: string;
+  /**
+   * `api-only` runs the mirror and the dashboard API WITHOUT starting the Telegram bot.
+   *
+   * Exists because the bot is a singleton: it holds a long-poll, and a second poller splits
+   * updates unpredictably between the two (LIVE-OBSERVED 2026-08-27, 25 conflicts). So a new
+   * deployment cannot simply be brought up alongside the running one to be checked — it has to
+   * come up mute, be seeded and verified, and only then take over. It also serves the
+   * BUILD_PLAN §12 fallback of publishing a read-only window while the bot stays local.
+   *
+   * Undo is unavailable in this mode and says so: reversing an action needs the bot that
+   * posted it.
+   */
+  mode: 'full' | 'api-only';
 }
 
 export class ConnectorConfigError extends Error {
@@ -190,6 +203,7 @@ const ConfigSchema = z
     apiPort: z.coerce.number().int().min(0).max(65535).default(4000),
     apiAdminToken: z.string().default(''),
     dashboardOrigin: z.string().default('http://localhost:3000'),
+    mode: z.enum(['full', 'api-only']).default('full'),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.priorityReserve >= cfg.dailyMindBudget) {
@@ -234,6 +248,7 @@ export function loadConnectorConfig(env: EnvLike = process.env): ConnectorConfig
   put('apiPort', 'KEEPER_API_PORT');
   put('apiAdminToken', 'KEEPER_ADMIN_TOKEN');
   put('dashboardOrigin', 'KEEPER_DASHBOARD_ORIGIN');
+  put('mode', 'KEEPER_MODE');
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {

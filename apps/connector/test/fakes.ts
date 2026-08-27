@@ -153,6 +153,7 @@ export function testConfig(overrides: Partial<ConnectorConfig> = {}): ConnectorC
     apiPort: 0, // tests construct the server directly; never bind a real port
     apiAdminToken: 'test-admin-token',
     dashboardOrigin: 'http://localhost:3000',
+    mode: 'full' as const,
     ...overrides,
   };
 }
