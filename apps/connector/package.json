@@ -17,6 +17,7 @@
     "probe:memory": "tsx src/tools/probe-memory.ts",
     "link:member": "tsx src/tools/link-member.ts",
     "test:judgment": "tsx src/tools/judgment-test.ts",
+    "dashboard:recall": "tsx src/tools/recall-members.ts",
     "evidence:capture": "tsx src/tools/capture-evidence.ts"
   },
   "dependencies": {

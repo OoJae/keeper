@@ -23,6 +23,7 @@
     "probe:memory": "pnpm --filter @keeper/connector probe:memory",
     "link:member": "pnpm --filter @keeper/connector link:member",
     "test:judgment": "pnpm --filter @keeper/connector test:judgment",
+    "dashboard:recall": "pnpm --filter @keeper/connector dashboard:recall",
     "evidence:capture": "pnpm --filter @keeper/connector evidence:capture"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@
  */
 
 export { serializeEnvelope, daysAgoSuffix, formatIsoWithOffset } from './envelope.js';
-export { extractDirective, gateDirective } from './directive.js';
+export { extractDirective, extractJsonBlock, gateDirective } from './directive.js';
 
 export {
   ConfidenceSchema,

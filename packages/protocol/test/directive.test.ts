@@ -395,3 +395,33 @@ describe('gateDirective', () => {
     expect(result.directive).toMatchObject({ action: 'delete', confidence: 'high' });
   });
 });
+
+
+describe('a wholesale-escaped block (LIVE-OBSERVED 2026-08-28)', () => {
+  /**
+   * The Mind answered inside <pre><code> with every quote backslash-escaped. JSON.parse
+   * rejects that outright, so a real `delete` directive fell back to `none` — Keeper read the
+   * spam correctly and did nothing. Same family as the collapsed-fence bug in API-NOTES.
+   */
+  it('recovers a directive whose every quote was escaped', () => {
+    const raw =
+      '<pre><code>{<br>&nbsp;&nbsp;\\"action\\": \\"delete\\",<br>' +
+      '&nbsp;&nbsp;\\"target_member\\": \\"@dr0pshipper_99\\",<br>' +
+      '&nbsp;&nbsp;\\"reasoning\\": \\"spam link drop\\",<br>' +
+      '&nbsp;&nbsp;\\"confidence\\": \\"high\\"<br>}</code></pre>';
+    const result = extractDirective(raw);
+    expect(result.kind).toBe('ok');
+    expect(result.directive.action).toBe('delete');
+  });
+
+  /**
+   * The guard that makes the repair safe: when unescaped delimiters exist, an escaped inner
+   * quote is real content and must survive untouched.
+   */
+  it('does not corrupt a legitimately escaped quote inside a message', () => {
+    const raw = '```json\n{"action":"reply","message":"he said \\"nice cut\\" and meant it","reasoning":"r","confidence":"high"}\n```';
+    const result = extractDirective(raw);
+    expect(result.kind).toBe('ok');
+    expect(result.directive).toMatchObject({ message: 'he said "nice cut" and meant it' });
+  });
+});

@@ -171,8 +171,26 @@ function decodeHtmlEntities(raw: string): string {
     .replace(/&amp;|&#0*38;/gi, '&');
 }
 
+/**
+ * Undo a wholesale backslash-escaping of the block.
+ *
+ * LIVE-OBSERVED 2026-08-28: the Mind answered inside `<pre><code>` with EVERY quote escaped —
+ * `{\\"action\\": \\"delete\\"}` — which `JSON.parse` rejects outright. A directive in that
+ * shape fell back to `none`, so Keeper read the spam correctly and did nothing. Same failure
+ * family as the collapsed-fence bug in docs/API-NOTES.md.
+ *
+ * Applied ONLY when no bare `"` survives once the escaped ones are removed. That condition is
+ * what makes it safe: a legitimately escaped inner quote (`{"message": "he said \\"hi\\""}`)
+ * always has unescaped delimiters around it, so this leaves it alone.
+ */
+function unescapeWholesale(s: string): string {
+  if (!s.includes('\\"')) return s;
+  if (s.replace(/\\"/g, '').includes('"')) return s;
+  return s.replace(/\\"/g, '"');
+}
+
 function repair(raw: string): string {
-  return decodeHtmlEntities(stripHtmlMarkup(raw))
+  return unescapeWholesale(decodeHtmlEntities(stripHtmlMarkup(raw)))
     .replace(/^\s*json\s*/i, '')
     .replace(/[“”„‟]/g, '"')
     .replace(/[‘’‚‛]/g, "'")
@@ -252,6 +270,27 @@ export function gateDirective(d: KeeperDirective): { directive: KeeperDirective;
 }
 
 /** Pull the KEEPER-ACTION directive out of whatever prose the Mind wrapped it in. */
+/**
+ * Find and parse the first JSON object in a Mind reply, whatever wrapper it arrived in.
+ *
+ * Everything `extractDirective` knows about this platform's mangling — collapsed fences,
+ * `<pre><code>` instead of backticks, `<br>`/`&nbsp;` inside the payload, entity-escaped
+ * quotes, smart quotes, trailing commas, wholesale backslash-escaping — applies here too,
+ * because it is the same Mind and the same renderer. Exported so tools that ask the Mind for
+ * structured answers reuse that hard-won handling instead of growing their own half of it.
+ *
+ * Returns `null` when nothing parses. No schema is applied; the caller validates.
+ */
+export function extractJsonBlock(replyText: string): unknown | null {
+  const text = replyText ?? '';
+  const bounded = text.length > MAX_SCAN_CHARS ? text.slice(0, MAX_SCAN_CHARS) : text;
+  for (const candidate of collectCandidates(text, bounded)) {
+    const parsed = tolerantParse(candidate.json);
+    if (parsed.ok) return parsed.value;
+  }
+  return null;
+}
+
 export function extractDirective(replyText: string): DirectiveParseResult {
   const text = typeof replyText === 'string' ? replyText : '';
   const bounded = text.length > MAX_SCAN_CHARS ? text.slice(0, MAX_SCAN_CHARS) : text;
