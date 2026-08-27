@@ -23,11 +23,11 @@ import {
   type Cognition,
   type Health,
   type Member,
-} from '@/lib/api';
-import { RelationshipGraph } from '@/components/RelationshipGraph';
-import { MemberPanel } from '@/components/MemberPanel';
-import { ModerationLog } from '@/components/ModerationLog';
-import { CognitionWidget, Leaderboard, UnpromptedFeed } from '@/components/Panels';
+} from '../lib/api';
+import { RelationshipGraph } from '../components/RelationshipGraph';
+import { MemberPanel } from '../components/MemberPanel';
+import { ModerationLog } from '../components/ModerationLog';
+import { CognitionWidget, Leaderboard, UnpromptedFeed } from '../components/Panels';
 
 const TOKEN_KEY = 'keeper.adminToken';
 

@@ -4,7 +4,7 @@
  * The three smaller panels. Grouped in one file because each is a handful of presentational
  * lines over data the connector already shaped — splitting them would be four files of imports.
  */
-import { ago, hkt, type ActionRow, type Cognition, type Health, type Member } from '@/lib/api';
+import { ago, hkt, type ActionRow, type Cognition, type Health, type Member } from '../lib/api';
 
 /**
  * The autonomy claim, made visually.
@@ -140,15 +140,18 @@ export function CognitionWidget({
         locally and cost nothing.
       </p>
 
-      {cognition !== null && (
+      {/*
+        The per-call log is written by whichever machine talks to the Mind, so a deployment that
+        only serves the mirror genuinely has no total to report. Saying nothing is better than
+        printing "0 exchanges" beside a note explaining the 0 is not real — the routed count
+        above is measured either way.
+      */}
+      {cognition !== null && cognition.estimatedCreditsToday !== null && (
         <div className="mt-3 border-t border-neutral-800 pt-2 text-xs text-neutral-500">
           <p>
             <span className="text-neutral-300">{cognition.exchangesToday}</span> total exchanges with
-            the Mind today, including build tooling
-            {cognition.estimatedCreditsToday !== null && (
-              <> &mdash; ≈ {cognition.estimatedCreditsToday} credits</>
-            )}
-            .
+            the Mind today, including build tooling &mdash; ≈ {cognition.estimatedCreditsToday}{' '}
+            credits.
           </p>
           <p className="mt-1">{cognition.note}</p>
         </div>

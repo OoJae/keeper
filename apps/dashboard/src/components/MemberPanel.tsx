@@ -11,7 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 
-import { API_BASE, WARMTH_COLOR, ago, hkt, type EventRow, type Member, type Recall } from '@/lib/api';
+import { API_BASE, WARMTH_COLOR, ago, hkt, type EventRow, type Member, type Recall } from '../lib/api';
 
 export function MemberPanel({ member, nowMs }: { member: Member | null; nowMs: number }) {
   const [events, setEvents] = useState<EventRow[]>([]);
