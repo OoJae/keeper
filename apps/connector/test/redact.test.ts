@@ -44,7 +44,7 @@ beforeEach(() => {
     JSON.stringify({
       members: {
         [String(REAL_HUMAN)]: {
-          handle: '@quietfox', display: 'Lol',
+          handle: '@quietfox', display: 'Fox',
           summary: 'A profile of a real person, written by an AI.',
           openLoops: ['what actually brought them in'],
           warmth: 'steady', warmthReason: 'quiet arrival',
@@ -57,7 +57,7 @@ beforeEach(() => {
     config, mirror, surface: new FakeSurface(),
     callLogPath: join(cacheDir, 'minds-calls.jsonl'), now: () => NOW,
   });
-  mirror.touchMember({ telegramId: REAL_HUMAN, handle: '@quietfox', display: 'Lol', tsMs: NOW, spoke: true });
+  mirror.touchMember({ telegramId: REAL_HUMAN, handle: '@quietfox', display: 'Fox', tsMs: NOW, spoke: true });
   mirror.touchMember({ telegramId: CAST, handle: 'lena_learns', display: 'Lena', tsMs: NOW, spoke: true });
   mirror.recordEvent({
     memberTelegramId: REAL_HUMAN, chatId: GROUP, messageId: 5, type: 'message',
@@ -86,7 +86,7 @@ describe('a real person never reaches the public API', () => {
     expect(real).toBeDefined();
     expect(JSON.stringify(members)).not.toContain(String(REAL_HUMAN));
     expect(JSON.stringify(members)).not.toContain('@quietfox');
-    expect(JSON.stringify(members)).not.toContain('Lol');
+    expect(JSON.stringify(members)).not.toContain('Fox');
     // The fictional cast is untouched — the demo depends on them being legible.
     expect(members.find((m: any) => m.telegramId === CAST).handle).toBe('lena_learns');
   });
