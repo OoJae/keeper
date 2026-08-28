@@ -51,6 +51,8 @@ Keeper has been running in a real Telegram group since 2026-08-24, on real elaps
 
 ## See it
 
+- **Site:** <https://site-six-wheat-17.vercel.app> — start here. The landing page is a corridor of real
+  messages hung in time; you traverse the 52-hour silence before the thread reassembles.
 - **Dashboard:** <https://dashboard-chi-one-92.vercel.app> — the relationship graph, what the
   Mind remembers about each member in its own words, the moderation log with its reasoning, and
   everything Keeper did unprompted.
@@ -66,7 +68,10 @@ So the public dashboard is a window onto a live system, not a second copy of it,
 as everything else. Its signature is **the Corridor of Days**: scroll is time, cards hang in
 Z-space at their true timestamps, and the 52-hour silence between Lena's last message and her
 return is something you physically traverse before the retrieved thread assembles beside Keeper's
-reply. `pnpm dev:site` → <http://localhost:3200>. The design system is documented at `/brand`.
+reply.
+
+Live at <https://site-six-wheat-17.vercel.app>; the design system is documented at
+[`/brand`](https://site-six-wheat-17.vercel.app/brand). Locally: `pnpm dev:site` → <http://localhost:3200>.
 
 Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
 **[docs/MINDS-INTEGRATION.md](docs/MINDS-INTEGRATION.md)** — start there.
