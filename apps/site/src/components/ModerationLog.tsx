@@ -18,7 +18,7 @@
  */
 import { useState } from 'react';
 
-import { ago, hkt, type ActionRow } from '../lib/api';
+import { ago, hkt, type ActionRow } from '../lib/dashboard-api';
 
 const BADGE: Record<string, string> = {
   executed: 'bg-emerald-950 text-emerald-400 border-emerald-900',

@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { Corridor } from '../components/Corridor';
-import { Reveal } from '../components/Reveal';
-import { Rule } from '../components/Rule';
+import { Corridor } from '../../components/Corridor';
+import { Reveal } from '../../components/Reveal';
+import { Rule } from '../../components/Rule';
 
 /**
  * The landing page.
@@ -160,12 +160,12 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal as="div" mode="fade" delay={0.28}>
-              <a
-                href="https://dashboard-chi-one-92.vercel.app"
+              <Link
+                href="/dashboard"
                 className="voice-record t-label text-mute underline-offset-8 transition-colors duration-300 hover:text-paper hover:underline"
               >
                 See the live dashboard
-              </a>
+              </Link>
             </Reveal>
           </div>
         </div>

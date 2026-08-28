@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from 'd3-force';
 
-import { WARMTH_COLOR, type Member, type Warmth } from '../lib/api';
+import { WARMTH_COLOR, type Member, type Warmth } from '../lib/dashboard-api';
 
 interface Node {
   id: number;

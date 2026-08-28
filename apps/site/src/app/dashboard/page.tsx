@@ -24,11 +24,11 @@ import {
   type Cognition,
   type Health,
   type Member,
-} from '../lib/api';
-import { RelationshipGraph } from '../components/RelationshipGraph';
-import { MemberPanel } from '../components/MemberPanel';
-import { ModerationLog } from '../components/ModerationLog';
-import { CognitionWidget, Leaderboard, UnpromptedFeed } from '../components/Panels';
+} from '../../lib/dashboard-api';
+import { RelationshipGraph } from '../../components/RelationshipGraph';
+import { MemberPanel } from '../../components/MemberPanel';
+import { ModerationLog } from '../../components/ModerationLog';
+import { CognitionWidget, Leaderboard, UnpromptedFeed } from '../../components/Panels';
 
 const TOKEN_KEY = 'keeper.adminToken';
 
@@ -100,7 +100,11 @@ export default function Page() {
   const down = loaded && health === null;
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-8">
+    // The dashboard keeps its own surface rather than inheriting the site's --void body. It is an
+    // evidenced, screenshotted tool days from submission; restyling it is a decision to take on
+    // purpose, not a side effect of moving it onto a shared origin.
+    <div className="min-h-screen bg-neutral-950 text-neutral-200">
+      <div className="mx-auto max-w-7xl px-5 py-8">
       <header className="mb-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-100">
@@ -208,6 +212,17 @@ export default function Page() {
           </div>
         </details>
       </footer>
-    </main>
+
+      {/* Neither surface should be a dead end now that they share an origin. */}
+      <div className="border-t border-neutral-800 py-6 text-center">
+        <a
+          href="/"
+          className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-neutral-500 transition-colors hover:text-neutral-200"
+        >
+          ← What Keeper is
+        </a>
+      </div>
+      </div>
+    </div>
   );
 }

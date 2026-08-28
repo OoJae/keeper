@@ -23,7 +23,7 @@ system.** Everything below follows from refusing to put relationship memory in a
         ▼                                          ▼
 ┌──────────────────────┐                  ┌──────────────────┐
 │  STEWARD MIND ★      │                  │  DASHBOARD       │
-│  • member memory     │                  │  (apps/dashboard)│
+│  • member memory     │                  │  (apps/site)     │
 │  • moderation calls  │                  │  relationship    │
 │  • digests, welcomes │                  │  graph, member   │
 │  • at-risk detection │                  │  timelines,      │
@@ -43,8 +43,9 @@ system.** Everything below follows from refusing to put relationship memory in a
 ```
   Vercel                          Railway                        your machine
   ──────                          ───────                        ────────────
-  apps/dashboard  ──HTTPS──▶  connector (api-only)          connector (full)
-  public, read-only           mirror + JSON API             THE BOT LIVES HERE
+  apps/site       ──HTTPS──▶  connector (api-only)          connector (full)
+   /  marketing               mirror + JSON API             THE BOT LIVES HERE
+   /dashboard  the tool
                               NO Telegram poll              Telegram long-poll
                               volume: /app/var              var/keeper.db
 ```

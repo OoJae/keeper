@@ -13,6 +13,8 @@ const LINKS = [
   { href: '/context', label: 'Context' },
   { href: '/memory', label: 'Memory' },
   { href: '/pricing', label: 'Pricing' },
+  // The tool shares this origin now, so it belongs in the nav rather than behind a stray link.
+  { href: '/dashboard', label: 'Dashboard' },
 ];
 
 export function Nav() {

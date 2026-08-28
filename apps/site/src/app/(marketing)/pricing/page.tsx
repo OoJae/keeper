@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PageHead } from '../../components/PageHead';
-import { Reveal } from '../../components/Reveal';
+import { PageHead } from '../../../components/PageHead';
+import { Reveal } from '../../../components/Reveal';
 
 export const metadata: Metadata = {
   title: 'Pricing — Keeper',

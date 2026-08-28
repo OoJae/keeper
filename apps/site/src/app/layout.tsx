@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import { Fraunces, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
-import { Nav } from '../components/Nav';
-import { SmoothScroll } from '../components/SmoothScroll';
 
 /**
  * Three faces, two voices.
@@ -28,6 +26,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://dashboard-chi-one-92.vercel.app'),
   title: 'Keeper — it remembers who came back',
   description:
     'A community steward that treats every member as an ongoing relationship. It picked up a thread 52 hours after it died, without being asked.',
@@ -44,8 +43,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to content
         </a>
-        <SmoothScroll />
-        <Nav />
         <main id="main">{children}</main>
       </body>
     </html>

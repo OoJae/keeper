@@ -51,9 +51,10 @@ Keeper has been running in a real Telegram group since 2026-08-24, on real elaps
 
 ## See it
 
-- **Site:** <https://site-six-wheat-17.vercel.app> — start here. The landing page is a corridor of real
-  messages hung in time; you traverse the 52-hour silence before the thread reassembles.
-- **Dashboard:** <https://dashboard-chi-one-92.vercel.app> — the relationship graph, what the
+- **<https://dashboard-chi-one-92.vercel.app>** — one address, two surfaces. The landing page is a
+  corridor of real messages hung in time: you traverse the 52-hour silence before the thread
+  reassembles.
+- **[/dashboard](https://dashboard-chi-one-92.vercel.app/dashboard)** — the same origin, the live tool. Relationship graph, what the
   Mind remembers about each member in its own words, the moderation log with its reasoning, and
   everything Keeper did unprompted.
 - **API:** <https://connector-production-b5e9.up.railway.app/api/members> — the same data, raw.
@@ -70,8 +71,9 @@ Z-space at their true timestamps, and the 52-hour silence between Lena's last me
 return is something you physically traverse before the retrieved thread assembles beside Keeper's
 reply.
 
-Live at <https://site-six-wheat-17.vercel.app>; the design system is documented at
-[`/brand`](https://site-six-wheat-17.vercel.app/brand). Locally: `pnpm dev:site` → <http://localhost:3200>.
+One Next app serves both surfaces: the marketing pages sit in a `(marketing)` route group with
+the nav and smooth scroll, and the tool sits at `/dashboard` without either. The design system is
+documented at [`/brand`](https://dashboard-chi-one-92.vercel.app/brand). Locally: `pnpm dev:site` → <http://localhost:3200>.
 
 Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
 **[docs/MINDS-INTEGRATION.md](docs/MINDS-INTEGRATION.md)** — start there.
@@ -81,7 +83,7 @@ Live task state: [docs/TASKS.md](docs/TASKS.md). Rubric-by-rubric verification:
 ```
 apps/connector    Telegram bot (grammY), event router, directive executor, SQLite mirror,
                   and the dashboard API (src/api/) incl. the public-view redaction layer
-apps/dashboard    Next.js dashboard — relationship graph, member timelines, moderation log
+apps/site         Next.js web app — relationship graph, member timelines, moderation log
 apps/seeder       Demo cast + dated event replay + scenario runner
 packages/protocol Member Identity Envelope + KEEPER-ACTION directive (zod, tested)
 packages/minds-client  Adapter over the Minds Messaging API (+ fallback transport)

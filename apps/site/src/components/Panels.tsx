@@ -4,7 +4,7 @@
  * The three smaller panels. Grouped in one file because each is a handful of presentational
  * lines over data the connector already shaped — splitting them would be four files of imports.
  */
-import { ago, hkt, type ActionRow, type Cognition, type Health, type Member } from '../lib/api';
+import { ago, hkt, type ActionRow, type Cognition, type Health, type Member } from '../lib/dashboard-api';
 
 /**
  * The autonomy claim, made visually.

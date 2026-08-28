@@ -8,7 +8,6 @@
   },
   "scripts": {
     "dev:connector": "pnpm --filter @keeper/connector dev",
-    "dev:dashboard": "pnpm --filter @keeper/dashboard dev",
     "seed:day": "pnpm --filter @keeper/seeder seed:day",
     "demo:run": "pnpm --filter @keeper/seeder demo:run",
     "test": "vitest run",
@@ -26,7 +25,7 @@
     "dashboard:recall": "pnpm --filter @keeper/connector dashboard:recall",
     "evidence:capture": "pnpm --filter @keeper/connector evidence:capture",
     "dev:site": "pnpm --filter @keeper/site dev",
-    "build:site": "pnpm --filter @keeper/site build"
+    "build:web": "pnpm --filter @keeper/site build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

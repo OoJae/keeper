@@ -158,9 +158,10 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
 - [x] Cognition widget — community exchanges vs total, each labelled with what it measures
 - [x] **Accept: PASSED.** Opens on Lena with her four open loops in the Mind's own words.
       Evidence: docs/EVIDENCE/dashboard.png
-- [x] **Marketing site LIVE** — https://site-six-wheat-17.vercel.app (Vercel). Six pages, brand assets,
-      the Corridor of Days. Built from the real mirror; the one real account appears only under
-      the pseudonym its own public API assigns. Swept live: 0 identity leaks on any route.
+- [x] **Site LIVE, merged onto ONE url** — https://dashboard-chi-one-92.vercel.app. Marketing at `/`
+      (Corridor of Days, six pages, brand assets), the tool at `/dashboard`, same origin. The
+      second Vercel project was deleted; two front doors for one product was a worse story than
+      one. Swept live across all seven routes: 0 identity leaks.
 - [x] **Deploy: LIVE.** Dashboard https://dashboard-chi-one-92.vercel.app (Vercel) reading
       https://connector-production-b5e9.up.railway.app (Railway). The Railway connector runs
       `KEEPER_MODE=api-only`, so **the Telegram bot stays local and there is exactly one poller**

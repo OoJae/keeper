@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import { PageHead } from '../../components/PageHead';
-import { Reveal } from '../../components/Reveal';
-import { Mark } from '../../components/Mark';
+import { PageHead } from '../../../components/PageHead';
+import { Reveal } from '../../../components/Reveal';
+import { Mark } from '../../../components/Mark';
 
 export const metadata: Metadata = {
   title: 'Brand — Keeper',

@@ -85,7 +85,7 @@ so it should be rotated at build.hellominds.ai/console and updated in `.env` and
 *after* recording — rotating mid-demo breaks the connector.
 
 ### B. `postcss` HIGH advisory in the Next build chain
-Two path-traversal advisories via `apps/dashboard > next > postcss`. Build-time only, and it
+Two path-traversal advisories via `apps/site > next > postcss`. Build-time only, and it
 processes *our* CSS, so it is not attacker-reachable here. Fixing it means moving Next off its
 pinned transitive dependency — not worth destabilising a working build before a recording.
 

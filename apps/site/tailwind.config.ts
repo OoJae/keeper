@@ -12,6 +12,9 @@ export default {
         steady: '#38BDF8',
         cooling: '#A78BFA',
         'at-risk': '#F43F5E',
+        // Both spellings kept: the site writes `at-risk`, the dashboard's config used `at_risk`.
+        // Neither is worth a rename in the same change that moves both apps onto one origin.
+        at_risk: '#F43F5E',
       },
       fontFamily: {
         display: ['var(--font-display)', 'Georgia', 'serif'],

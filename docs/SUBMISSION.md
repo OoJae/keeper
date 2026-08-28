@@ -17,8 +17,7 @@ Every creator community, run like a relationship — not a rulebook.
 ## Links
 | | |
 |---|---|
-| Site | https://site-six-wheat-17.vercel.app |
-| Live dashboard | https://dashboard-chi-one-92.vercel.app |
+| Site + dashboard | https://dashboard-chi-one-92.vercel.app |
 | Public API | https://connector-production-b5e9.up.railway.app/api/members |
 | Repo | https://github.com/OoJae/keeper |
 | Video | *(paste after upload)* |
@@ -80,7 +79,7 @@ everyone. The memory *is* the product.
 
 - [ ] Video 1.5–2:00, audible, captioned, uploaded, link pasted above
 - [ ] **Builder key rotated**, then repo flipped **public** (`gh repo edit OoJae/keeper --visibility public`)
-- [ ] Live dashboard reachable from a logged-out browser
+- [ ] Site reachable from a logged-out browser, and /dashboard shows live data
 - [ ] Student status stated in the form itself, not only here
 - [ ] Confirmation screenshot saved to `docs/EVIDENCE/`
 

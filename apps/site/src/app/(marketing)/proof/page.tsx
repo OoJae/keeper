@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { PageHead } from '../../components/PageHead';
-import { LogRow } from '../../components/LogRow';
-import { Reveal } from '../../components/Reveal';
-import { Constellation } from '../../components/Constellation';
+import Link from 'next/link';
+import { PageHead } from '../../../components/PageHead';
+import { LogRow } from '../../../components/LogRow';
+import { Reveal } from '../../../components/Reveal';
+import { Constellation } from '../../../components/Constellation';
 
 export const metadata: Metadata = {
   title: 'Proof — Keeper',
@@ -91,15 +92,15 @@ export default function Proof() {
             last heard from days ago. Our code is not in the loop.
           </Reveal>
           <Reveal as="div" mode="fade" delay={0.2} className="mt-10">
-            <a
-              href="https://dashboard-chi-one-92.vercel.app"
+            <Link
+              href="/dashboard"
               className="voice-record t-label group inline-flex items-center gap-3 rounded-full border border-paper/25 px-7 py-4 text-paper transition-colors duration-500 ease-out hover:border-warm hover:text-warm"
             >
               Open the live dashboard
               <span className="inline-block transition-transform duration-500 ease-out group-hover:translate-x-1.5">
                 →
               </span>
-            </a>
+            </Link>
           </Reveal>
         </div>
       </section>
