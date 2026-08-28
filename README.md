@@ -113,7 +113,7 @@ Then, in a second terminal:
 
 ```bash
 pnpm dashboard:recall     # ask the Mind what it remembers about each member (25–200s each)
-pnpm dev:dashboard        # http://localhost:3000
+pnpm dev:site             # http://localhost:3200 — marketing at /, the tool at /dashboard
 ```
 
 **On the API.** Read endpoints are public by design — the moderation log is meant to be looked
