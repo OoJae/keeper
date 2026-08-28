@@ -11,7 +11,7 @@ or the code, not recalled. Findings are ordered by what they would actually cost
 ## Fixed
 
 ### 1. A real person's data was on a public URL — HIGH
-The dashboard went public and took a real human with it. `@quietfox` joined the real Telegram
+The dashboard went public and took a real human with it. `member_bidh7` joined the real Telegram
 group; the API published their **real Telegram user id**, handle, display name, join time, their
 message content, and the Mind's written behavioural assessment of them (*"brand-new member with a
 quiet arrival… lurking past the one-day mark"*). BUILD_PLAN §8 promises *"No real user data"* —
@@ -138,7 +138,7 @@ worth deferring has passed. It is a deliberate, reversible decision — not a de
 difference between judges *reading* Keeper and judges *using* it.
 
 ### H. Keeper can still moderate a real person
-`@quietfox` is a real account in a moderated group. Confidence gating, the destructive-action
+`member_bidh7` is a real account in a moderated group. Confidence gating, the destructive-action
 fence and `/keeper undo` all apply, and nothing has been directed at them — but the demo community
 is not purely fictional, and the README should not imply it is.
 

@@ -19,3 +19,6 @@ apps/dashboard/.next/
 apps/dashboard/next-env.d.ts
 *.tsbuildinfo
 
+
+# Backups of var/ hold the UNREDACTED mirror, including a real account. Never publish one.
+var.backup-*/

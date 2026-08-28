@@ -96,7 +96,7 @@ rewards become autonomous *recommendations* in the digest. No sentimentality.
       never-used conversation: docs/EVIDENCE/memory-continuity.md
 - [x] Autonomy #1 — digest FIRED NATIVELY 2026-08-25 ("on my own initiative, no re-asking").
       docs/EVIDENCE/autonomy-digest.md. A clean one still to capture (`/keeper digest`).
-- [x] Autonomy #2 — welcome fires on join (evidenced 2026-08-26, @quietfox).
+- [x] Autonomy #2 — welcome fires on join (evidenced 2026-08-26, member_bidh7).
       CheckinScheduler built and tested; its check-in is due 2026-08-27.
 - [x] Autonomy #3 — all three digest paths ask for who has gone quiet, and no code computes
       it (asserted by test). Read it out of the clean digest.

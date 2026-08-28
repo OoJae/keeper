@@ -137,7 +137,7 @@ export function publicEvent(
  * Scrub identifiers out of FREE TEXT.
  *
  * Redacting structured fields is the easy half. The hard half is that the Mind writes prose about
- * people — "quietfox (id:7000000001, display:'Lol') joined 2026-08-26…" — and that prose is the
+ * people — "@quietfox (id:7000000001, display:'Fox') joined 2026-08-26…" — and that prose is the
  * moderation log's whole value, so it cannot simply be dropped. Four of five leaks that survived
  * the first pass were in `reasoning` and `message`, written by the Mind, not by us.
  *
@@ -161,7 +161,7 @@ export function createScrubber(members: readonly MemberSnapshot[]): TextScrubber
       rules.push({ re: new RegExp(`\\b${escapeRe(m.display)}\\b`, 'g'), to: `member_${tag}` });
     } else if (m.display !== '') {
       // A short display name is left alone in ordinary prose (mangling every "lol" would corrupt
-      // the log), but the Mind writes it in one unmistakable shape — display:'Lol' — and there it
+      // the log), but the Mind writes it in one unmistakable shape — display:'Fox' — and there it
       // is unambiguously the person's name rather than a word someone typed. Scrub that form
       // specifically: precise where a bare word match would not be.
       rules.push({

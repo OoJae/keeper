@@ -44,7 +44,7 @@ beforeEach(() => {
     JSON.stringify({
       members: {
         [String(REAL_HUMAN)]: {
-          handle: 'quietfox', display: 'Lol',
+          handle: '@quietfox', display: 'Lol',
           summary: 'A profile of a real person, written by an AI.',
           openLoops: ['what actually brought them in'],
           warmth: 'steady', warmthReason: 'quiet arrival',
@@ -57,7 +57,7 @@ beforeEach(() => {
     config, mirror, surface: new FakeSurface(),
     callLogPath: join(cacheDir, 'minds-calls.jsonl'), now: () => NOW,
   });
-  mirror.touchMember({ telegramId: REAL_HUMAN, handle: 'quietfox', display: 'Lol', tsMs: NOW, spoke: true });
+  mirror.touchMember({ telegramId: REAL_HUMAN, handle: '@quietfox', display: 'Lol', tsMs: NOW, spoke: true });
   mirror.touchMember({ telegramId: CAST, handle: 'lena_learns', display: 'Lena', tsMs: NOW, spoke: true });
   mirror.recordEvent({
     memberTelegramId: REAL_HUMAN, chatId: GROUP, messageId: 5, type: 'message',
@@ -65,7 +65,7 @@ beforeEach(() => {
   });
   mirror.recordAction({
     eventId: null, action: 'reply', originalAction: 'reply',
-    targetHandle: 'quietfox', targetTelegramId: REAL_HUMAN,
+    targetHandle: '@quietfox', targetTelegramId: REAL_HUMAN,
     message: 'welcome', reasoning: 'day-2 check-in', confidence: 'high', gated: false,
     warnings: [], status: 'executed', detail: 'posted',
     rawReply: '<p>the Mind said something internal here</p>', tsMs: NOW,
@@ -85,7 +85,7 @@ describe('a real person never reaches the public API', () => {
 
     expect(real).toBeDefined();
     expect(JSON.stringify(members)).not.toContain(String(REAL_HUMAN));
-    expect(JSON.stringify(members)).not.toContain('quietfox');
+    expect(JSON.stringify(members)).not.toContain('@quietfox');
     expect(JSON.stringify(members)).not.toContain('Lol');
     // The fictional cast is untouched — the demo depends on them being legible.
     expect(members.find((m: any) => m.telegramId === CAST).handle).toBe('lena_learns');
@@ -157,7 +157,7 @@ describe('operational internals are not public', () => {
   it('does not leak a real id through an action’s target', async () => {
     const { actions } = await get('/api/actions');
     expect(JSON.stringify(actions)).not.toContain(String(REAL_HUMAN));
-    expect(actions[0].targetHandle).not.toBe('quietfox');
+    expect(actions[0].targetHandle).not.toBe('@quietfox');
   });
 });
 
@@ -172,8 +172,8 @@ describe('free text written by the Mind is scrubbed too', () => {
     mirror.recordAction({
       eventId: null, action: 'reply', originalAction: 'reply',
       targetHandle: `quietfox (id:${REAL_HUMAN})`, targetTelegramId: null,
-      message: `WHO JOINED: quietfox (@quietfox, id:${REAL_HUMAN}) at 17:17Z today`,
-      reasoning: `24h check-in per covenant. quietfox (id:${REAL_HUMAN}, display:'Lol') joined 2026-08-26`,
+      message: `WHO JOINED: @quietfox (@quietfox, id:${REAL_HUMAN}) at 17:17Z today`,
+      reasoning: `24h check-in per covenant. @quietfox (id:${REAL_HUMAN}, display:'Fox') joined 2026-08-26`,
       confidence: 'high', gated: false, warnings: [], status: 'executed',
       detail: `replied to @quietfox`, rawReply: '', tsMs: NOW,
     });
@@ -201,13 +201,13 @@ describe('free text written by the Mind is scrubbed too', () => {
     // actually appeared on the live dashboard.
     mirror.recordAction({
       eventId: null, action: 'reply', originalAction: 'reply',
-      reasoning: `member joined (id:${REAL_HUMAN}, display:'Lol') at 01:17`,
+      reasoning: `member joined (id:${REAL_HUMAN}, display:'Fox') at 01:17`,
       confidence: 'high', gated: false, warnings: [], status: 'executed',
       detail: '', rawReply: '', tsMs: NOW,
     });
     const { actions } = await get('/api/actions');
     const row = actions.find((a: any) => a.reasoning.includes('at 01:17'));
-    expect(row.reasoning).not.toContain("display:'Lol'");
+    expect(row.reasoning).not.toContain("display:'Fox'");
     expect(row.reasoning).toMatch(/display:'member_[a-z0-9]+'/);
   });
 

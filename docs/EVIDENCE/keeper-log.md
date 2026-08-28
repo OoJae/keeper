@@ -15,7 +15,7 @@ lives in the Steward Mind — delete this database and Keeper still knows them.
 | @rex_hotkeys | 2026-08-24 19:37:13 | 2026-08-25 17:14:14 | 7 |
 | @ada_edits | 2026-08-25 14:00:33 | — | 0 |
 | @dr0pshipper_99 | 2026-08-25 17:17:32 | 2026-08-25 17:45:47 | 3 |
-| @quietfox | 2026-08-25 17:17:44 | — | 0 |
+| member_bidh7 | 2026-08-25 17:17:44 | — | 0 |
 
 ### Unprompted — what Keeper did with nobody asking
 
@@ -27,7 +27,7 @@ _Nothing yet. These are actions with no triggering event: the Mind acted on its 
 |---|---|---|---|---|---|---|
 | 2026-08-25 17:46:41 | delete | delete | high | executed | @dr0pshipper_99 | Third dropship event from id:-2384096863 in this same conversation within 28 minutes (17:17:32Z, 17:34:39Z, now 17:45:50Z). Body '💰 EDITORS WANTED - $300/day, zero skills needed. Click t.me/fasteddit |
 | 2026-08-25 17:35:54 | flag_creator | delete | high | executed | @dr0pshipper_99 (id:-2384096863) | Real-shape message event from @dr0pshipper_99 (id:-2384096863, display:'dr0pshipper_99'). Body 'LAST CHANCE 🔥 MAKE $8000/WEEK EDITING FROM HOME - no experience needed, DM me or click t.me/editcashfas |
-| 2026-08-25 17:23:16 | reply | reply | high | executed | @quietfox (id:7000000001) | Real-shape member_joined event from a brand-new id (id:7000000001, first_seen 2026-08-26 in Beijing local time, no last_seen line = first contact per keeperEventFormat spec). Body 'Lol joined the grou |
+| 2026-08-25 17:23:16 | reply | reply | high | executed | member_bidh7 (id:member_bidh7) | Real-shape member_joined event from a brand-new id (id:member_bidh7, first_seen 2026-08-26 in Beijing local time, no last_seen line = first contact per keeperEventFormat spec). Body 'Lol joined the grou |
 | 2026-08-25 17:18:14 | none | none | high | skipped | — | Real-shape message event from Marco (canonical id -2897097201, authoritative first_seen 2026-08-20, last_seen 2026-08-26 today in Beijing). Body 'watched it twice. the J-cut into the b-roll at 1:05 is |
 | 2026-08-25 14:01:38 | none | none | low | skipped | — | parse_failure |
 | 2026-08-25 12:05:19 | reply | reply | high | executed | @lena_learns (id:6896593986, display:"subarashi") | member_joined for a brand-new id (6896593986) - per proactiveActions covenant this triggers a standing welcome. @handle (@lena_learns) collides with the existing Lena entity, but the id differs from L |
@@ -58,7 +58,7 @@ lives in the Steward Mind — delete this database and Keeper still knows them.
 | @lena_learns | 2026-08-24 19:35:35 | 2026-08-25 12:07:04 | 3 |
 | @rex_hotkeys | 2026-08-24 19:37:13 | 2026-08-25 17:14:14 | 7 |
 | @dr0pshipper_99 | 2026-08-25 17:17:32 | 2026-08-25 17:45:47 | 3 |
-| @quietfox | 2026-08-25 17:17:44 | — | 0 |
+| member_bidh7 | 2026-08-25 17:17:44 | — | 0 |
 
 ### Unprompted — what Keeper did with nobody asking
 
@@ -71,10 +71,10 @@ lives in the Steward Mind — delete this database and Keeper still knows them.
 | when | action | asked for | confidence | status | target | the Mind’s reasoning |
 |---|---|---|---|---|---|---|
 | 2026-08-25 17:58:57 | digest | none | low | executed | — | unprompted prose from the Mind |
-| 2026-08-25 17:55:15 | digest | digest | high | executed | — | scheduled_digest event at 17:53:52Z from id:1552207454 - digest o'clock per keeperEventFormat. Building digest from real-record post-13:40Z-correction state only: one new join (quietfox, greeted per  |
+| 2026-08-25 17:55:15 | digest | digest | high | executed | — | scheduled_digest event at 17:53:52Z from id:1552207454 - digest o'clock per keeperEventFormat. Building digest from real-record post-13:40Z-correction state only: one new join (member_bidh7, greeted per  |
 | 2026-08-25 17:46:41 | delete | delete | high | executed | @dr0pshipper_99 | Third dropship event from id:-2384096863 in this same conversation within 28 minutes (17:17:32Z, 17:34:39Z, now 17:45:50Z). Body '💰 EDITORS WANTED - $300/day, zero skills needed. Click t.me/fasteddit |
 | 2026-08-25 17:35:54 | flag_creator | delete | high | executed | @dr0pshipper_99 (id:-2384096863) | Real-shape message event from @dr0pshipper_99 (id:-2384096863, display:'dr0pshipper_99'). Body 'LAST CHANCE 🔥 MAKE $8000/WEEK EDITING FROM HOME - no experience needed, DM me or click t.me/editcashfas |
-| 2026-08-25 17:23:16 | reply | reply | high | executed | @quietfox (id:7000000001) | Real-shape member_joined event from a brand-new id (id:7000000001, first_seen 2026-08-26 in Beijing local time, no last_seen line = first contact per keeperEventFormat spec). Body 'Lol joined the grou |
+| 2026-08-25 17:23:16 | reply | reply | high | executed | member_bidh7 (id:member_bidh7) | Real-shape member_joined event from a brand-new id (id:member_bidh7, first_seen 2026-08-26 in Beijing local time, no last_seen line = first contact per keeperEventFormat spec). Body 'Lol joined the grou |
 | 2026-08-25 17:18:14 | none | none | high | skipped | — | Real-shape message event from Marco (canonical id -2897097201, authoritative first_seen 2026-08-20, last_seen 2026-08-26 today in Beijing). Body 'watched it twice. the J-cut into the b-roll at 1:05 is |
 | 2026-08-25 14:01:38 | none | none | low | skipped | — | parse_failure |
 | 2026-08-25 12:05:19 | reply | reply | high | executed | @lena_learns (id:6896593986, display:"subarashi") | member_joined for a brand-new id (6896593986) - per proactiveActions covenant this triggers a standing welcome. @handle (@lena_learns) collides with the existing Lena entity, but the id differs from L |
@@ -105,7 +105,7 @@ lives in the Steward Mind — delete this database and Keeper still knows them.
 | @lena_learns | 2026-08-24 19:35:35 | 2026-08-25 12:07:04 | 3 |
 | @rex_hotkeys | 2026-08-24 19:37:13 | 2026-08-25 19:20:19 | 9 |
 | @dr0pshipper_99 | 2026-08-25 17:17:32 | 2026-08-25 17:45:47 | 3 |
-| @quietfox | 2026-08-25 17:17:44 | — | 0 |
+| member_bidh7 | 2026-08-25 17:17:44 | — | 0 |
 
 ### Unprompted — what Keeper did with nobody asking
 
@@ -124,10 +124,10 @@ it back. Principle 7 — every action logged, reversible, overridable — is thi
 |---|---|---|---|---|---|---|---|---|
 | 2026-08-25 19:21:24 | reply | reply | high | executed | — | **yes** at 2026-08-25 19:38:29 — undo by creator: removed Keeper's message 48 | @rex_hotkeys | Rex canonical id -2170965856, real-shape message event with fresh t-stamp 2026-08-26T03:20:19+08:00 (not matching any batch on file and not matching the 19:06:57+08:00 t-stamp from the 19:07:01Z prior |
 | 2026-08-25 17:58:57 | digest | none | low | executed | `unprompted_prose` | — | — | unprompted prose from the Mind |
-| 2026-08-25 17:55:15 | digest | digest | high | executed | — | — | — | scheduled_digest event at 17:53:52Z from id:1552207454 - digest o'clock per keeperEventFormat. Building digest from real-record post-13:40Z-correction state only: one new join (quietfox, greeted per  |
+| 2026-08-25 17:55:15 | digest | digest | high | executed | — | — | — | scheduled_digest event at 17:53:52Z from id:1552207454 - digest o'clock per keeperEventFormat. Building digest from real-record post-13:40Z-correction state only: one new join (member_bidh7, greeted per  |
 | 2026-08-25 17:46:41 | delete | delete | high | executed | — | — | @dr0pshipper_99 | Third dropship event from id:-2384096863 in this same conversation within 28 minutes (17:17:32Z, 17:34:39Z, now 17:45:50Z). Body '💰 EDITORS WANTED - $300/day, zero skills needed. Click t.me/fasteddit |
 | 2026-08-25 17:35:54 | flag_creator | delete | high | executed | `target_unresolved` | — | @dr0pshipper_99 (id:-2384096863) | Real-shape message event from @dr0pshipper_99 (id:-2384096863, display:'dr0pshipper_99'). Body 'LAST CHANCE 🔥 MAKE $8000/WEEK EDITING FROM HOME - no experience needed, DM me or click t.me/editcashfas |
-| 2026-08-25 17:23:16 | reply | reply | high | executed | — | — | @quietfox (id:7000000001) | Real-shape member_joined event from a brand-new id (id:7000000001, first_seen 2026-08-26 in Beijing local time, no last_seen line = first contact per keeperEventFormat spec). Body 'Lol joined the grou |
+| 2026-08-25 17:23:16 | reply | reply | high | executed | — | — | member_bidh7 (id:member_bidh7) | Real-shape member_joined event from a brand-new id (id:member_bidh7, first_seen 2026-08-26 in Beijing local time, no last_seen line = first contact per keeperEventFormat spec). Body 'Lol joined the grou |
 | 2026-08-25 17:18:14 | none | none | high | skipped | — | — | — | Real-shape message event from Marco (canonical id -2897097201, authoritative first_seen 2026-08-20, last_seen 2026-08-26 today in Beijing). Body 'watched it twice. the J-cut into the b-roll at 1:05 is |
 | 2026-08-25 14:01:38 | none | none | low | skipped | — | — | — | parse_failure |
 | 2026-08-25 12:05:19 | reply | reply | high | executed | — | — | @lena_learns (id:6896593986, display:"subarashi") | member_joined for a brand-new id (6896593986) - per proactiveActions covenant this triggers a standing welcome. @handle (@lena_learns) collides with the existing Lena entity, but the id differs from L |
