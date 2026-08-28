@@ -61,7 +61,7 @@ export interface ActionRow {
   overriddenAtMs: number | null;
   /**
    * Whether an undo APPLIES — deliberately not the plan itself. The API withholds undo plans,
-   * posted message ids and chat ids: they are the coordinates of a private group and the
+   * posted message ids and chat ids: they are operational coordinates of a live group and the
    * dashboard never needed them to draw a button.
    */
   reversible: boolean;

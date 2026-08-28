@@ -64,7 +64,7 @@ Stated plainly, because a demo that hides its edges is worth less than one that 
   request is routed to the creator instead (`mute_not_implemented`).
 - **The dashboard is not the product.** Everything Keeper knows can be read out of the Mind
   itself; the dashboard renders it.
-- **The cast is fictional.** "Ada's Editing Lab" is a private group with invented characters
+- **The cast is fictional.** "Ada's Editing Lab" is a **public** group (t.me/adaeditinglab) with invented characters
   played by real Telegram accounts. What is *not* invented: the elapsed days, the timestamps,
   the cross-session recall, and the unprompted messages. No timestamp in this repository was
   ever written by hand — BUILD_PLAN §8.

@@ -139,9 +139,13 @@ export default function Page() {
           Keeper still knows everyone.
         </p>
         <p className="mt-2 max-w-3xl text-xs leading-relaxed text-neutral-500">
-          The community is a fictional cast in a private group. Real people can still join one, so
-          any real account here is <span className="text-neutral-400">pseudonymised</span> and its
-          messages withheld &mdash; what Keeper did is public, who they are is not.
+          The community is a fictional cast in a{' '}
+          <a href="https://t.me/adaeditinglab" className="text-neutral-300 underline underline-offset-4">
+            public group you can join
+          </a>
+          . Real people do join it, so any real account here is{' '}
+          <span className="text-neutral-400">pseudonymised</span> and its messages withheld &mdash;
+          what Keeper did is public, who they are is not.
         </p>
       </header>
 

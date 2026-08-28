@@ -86,12 +86,26 @@ export default function Proof() {
           <Reveal as="p" className="t-section voice-mind max-w-[20ch]">
             Try it yourself.
           </Reveal>
-          <Reveal as="p" mode="fade" delay={0.1} className="t-body mt-6 max-w-[56ch] text-mute">
-            Open a conversation to the Steward Mind that Keeper has never used and ask who
-            @lena_learns is. It answers from memory, in a thread with no history, about a member it
-            last heard from days ago. Our code is not in the loop.
+          <Reveal as="p" mode="fade" delay={0.1} className="t-body mt-6 max-w-[58ch] text-mute">
+            The community is a real, public Telegram group. Join it, ask an editing question, and
+            watch what Keeper does with it &mdash; then come back in a couple of days and see
+            whether it remembers you. It replies in 25&ndash;200s: the Mind thinks before it acts,
+            and nothing here hides that.
+          </Reveal>
+          <Reveal as="p" mode="fade" delay={0.16} className="t-body mt-4 max-w-[58ch] text-mute">
+            Ask it <span className="voice-record text-paper">/keeper why</span> in the group and it
+            will tell you the reasoning behind the last thing it did.
           </Reveal>
           <Reveal as="div" mode="fade" delay={0.2} className="mt-10">
+            <a
+              href="https://t.me/adaeditinglab"
+              className="voice-record t-label group mr-4 inline-flex items-center gap-3 rounded-full border border-warm/60 px-7 py-4 text-warm transition-colors duration-500 ease-out hover:border-warm hover:bg-warm hover:text-void"
+            >
+              Join the community
+              <span className="inline-block transition-transform duration-500 ease-out group-hover:translate-x-1.5">
+                →
+              </span>
+            </a>
             <Link
               href="/dashboard"
               className="voice-record t-label group inline-flex items-center gap-3 rounded-full border border-paper/25 px-7 py-4 text-paper transition-colors duration-500 ease-out hover:border-warm hover:text-warm"

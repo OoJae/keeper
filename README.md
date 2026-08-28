@@ -49,6 +49,15 @@ Keeper has been running in a real Telegram group since 2026-08-24, on real elaps
   show and we do not pretend otherwise. Rewards are autonomous **nominations** the creator
   approves. Details, with the full transcript: [API-NOTES.md](docs/API-NOTES.md).
 
+## Try it
+
+**Join the community: <https://t.me/adaeditinglab>.** Ask an editing question, or come back after
+a couple of days and see whether Keeper remembers you. It replies in 25–200s — the Mind thinks
+before it acts, and the UX is built around that rather than hiding it.
+
+In-group commands (creator-only ones will refuse you, which is the point):
+`/keeper status` · `/keeper why` — the reasoning behind its last action.
+
 ## See it
 
 - **<https://dashboard-chi-one-92.vercel.app>** — one address, two surfaces. The landing page is a
@@ -137,6 +146,8 @@ Useful while running: `/keeper status`, `/keeper why`, `/keeper undo`, `/keeper 
 
 ## Note on the demo community
 
-The demo community ("Ada's Editing Lab") is a **fictional cast in a private group**. The
+The demo community ("Ada's Editing Lab") is a **fictional cast in a public group** you can join:
+<https://t.me/adaeditinglab>. Post a question about video editing and watch what Keeper does with
+it — that is the honest test, and it is open to anyone. The
 cast is invented; the persistence is real — real elapsed days, real cross-session memory,
 real unprompted messages, real timestamps. Nothing in the demo is staged after the fact.

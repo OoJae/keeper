@@ -4,7 +4,7 @@ An attempt to break the whole system rather than admire it: the deployed API, th
 protocol, the docs, and the claims. Everything below was checked against the running deployment
 or the code, not recalled. Findings are ordered by what they would actually cost.
 
-**Fixed in this pass: 9. Outstanding and stated: 8.**
+**Fixed in this pass: 10. Outstanding and stated: 9.**
 
 ---
 
@@ -76,6 +76,21 @@ is. **Fixed**: both updated.
 
 ---
 
+### 10. Three surfaces said the group was private. It is public — MEDIUM (accuracy)
+`README.md`, `docs/MINDS-INTEGRATION.md` and the live dashboard all described "Ada's Editing Lab"
+as a **private** group. It has a public username (`@adaeditinglab`) and Telegram serves a join
+page: *"You can view and join @adaeditinglab right away."* Three surfaces stating something
+checkably false, on a project whose entire pitch is *check me*.
+
+**Fixed**, and turned into the thing it should always have been: judges are now told they can join
+at <https://t.me/adaeditinglab>, ask an editing question, and watch what Keeper does with it. The
+`/proof` page previously told them to "open a conversation to the Steward Mind" — an instruction
+requiring an API key they do not have, addressed to the exact audience that cannot follow it.
+
+The privacy posture is unchanged and still holds: real accounts were already pseudonymised
+everywhere the product is public, which is the correct treatment whether the group is public or
+not.
+
 ## Outstanding — deliberate or needing a human
 
 ### A. The Builder API key must be rotated before the repo goes public — **ACTION REQUIRED**
@@ -110,6 +125,17 @@ none. The proxy's behaviour is asserted indirectly through the connector's API t
 ### G. The public dashboard will drift further out of date
 It is a snapshot by design (see §5). Re-seeding is manual. The badge makes the age visible, which
 is the honest minimum, but a judge visiting in a week sees week-old data.
+
+### I. The bot judges would interact with runs on the builder's machine
+The deployed connector is `api-only` by design — one Telegram poller, and it is the local one. So
+the dashboard and the API are up 24/7, but **Keeper only answers in the group while the local
+connector is running**. A judge who joins and posts while it is off sees nothing happen, and the
+deployed mirror will not show their message either, because nothing writes to it.
+
+Closing this means a cutover: `KEEPER_MODE=full` on Railway and stopping the local connector, so
+the bot is hosted. The Steward has ~612 credits, the recording is done, and the risk that made this
+worth deferring has passed. It is a deliberate, reversible decision — not a defect — but it is the
+difference between judges *reading* Keeper and judges *using* it.
 
 ### H. Keeper can still moderate a real person
 `@quietfox` is a real account in a moderated group. Confidence gating, the destructive-action
