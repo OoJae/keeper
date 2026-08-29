@@ -135,14 +135,11 @@ way.
 Useful while running: `/keeper status`, `/keeper why`, `/keeper undo`, `/keeper pause`.
 
 ## Documentation
-
-- [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) — phases, calendar, demo script, submission plan
-- [docs/STRATEGY.md](docs/STRATEGY.md) — why Keeper, and why this track
 - [docs/API-NOTES.md](docs/API-NOTES.md) — **verified** Minds platform behavior
 - [docs/TASKS.md](docs/TASKS.md) — live task tracker
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, deployment topology, redaction boundary
 - [docs/AUDIT.md](docs/AUDIT.md) — adversarial review: what was found, fixed, and left
-- [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md) — the shooting script, grounded in real timestamps
+
 
 ## Note on the demo community
 
